@@ -192,7 +192,10 @@ app.post('/send', async (req, res) => {
     return res.status(400).json({ ok: false, reason: 'phone and message required' });
   }
 
-  const normalised = phone.replace(/\D/g, '');
+  let normalised = phone.replace(/\D/g, '');
+  if (normalised.length === 10) {
+    normalised = '91' + normalised;
+  }
   if (normalised.length < 10) {
     return res.status(400).json({ ok: false, reason: `Invalid phone: ${phone}` });
   }
