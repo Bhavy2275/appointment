@@ -8,52 +8,35 @@ const {
   makeCacheableSignalKeyStore,
 } = require('@whiskeysockets/baileys');
 const express   = require('express');
-const qrcode    = require('qrcode-terminal');
+const qrcode    = require('qrcode');
 const path      = require('path');
 const fs        = require('fs');
 const { Boom }  = require('@hapi/boom');
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const PORT              = parseInt(process.env.WHATSAPP_PORT || '3001', 10);
+const PORT              = parseInt(process.env.WHATSAPP_PORT || process.env.PORT || '3001', 10);
 const WHATSAPP_ENABLED  = process.env.WHATSAPP_ENABLED === 'true';
 const DAILY_LIMIT       = parseInt(process.env.WHATSAPP_DAILY_SEND_LIMIT || '200', 10);
 const AUTH_DIR          = path.join(__dirname, 'auth_info_baileys');
-const MIN_DELAY_MS      = 1500;   // minimum inter-message delay (ms)
-const MAX_DELAY_MS      = 3000;   // maximum inter-message delay (ms)
-const MAX_RECONNECTS    = 3;
+const MIN_DELAY_MS      = 1500;
+const MAX_DELAY_MS      = 3000;
+const MAX_RECONNECTS    = 5;
 
-// ─── ⚠️  Ban-risk warning ─────────────────────────────────────────────────────
-console.warn(`
-╔══════════════════════════════════════════════════════════════════╗
-║  ⚠️   UNOFFICIAL WHATSAPP INTEGRATION — BAN RISK                ║
-║                                                                  ║
-║  This service uses Baileys, an unofficial reverse-engineered     ║
-║  WhatsApp library. Meta (WhatsApp) can detect and permanently    ║
-║  ban the linked number at any time without warning.              ║
-║                                                                  ║
-║  Set WHATSAPP_ENABLED=false to stop sending immediately.         ║
-╚══════════════════════════════════════════════════════════════════╝
-`);
-
-// ─── Daily send counter ───────────────────────────────────────────────────────
 let dailySendCount = 0;
 let dailyResetDate = new Date().toDateString();
+let latestQrDataUrl = null;
 
 function checkAndIncrementDailyCount() {
   const today = new Date().toDateString();
   if (today !== dailyResetDate) {
     dailySendCount = 0;
     dailyResetDate = today;
-    console.log('[WhatsApp] Daily send counter reset to 0.');
   }
-  if (dailySendCount >= DAILY_LIMIT) {
-    return false;
-  }
+  if (dailySendCount >= DAILY_LIMIT) return false;
   dailySendCount++;
   return true;
 }
 
-// ─── Random jitter delay to avoid spam patterns ───────────────────────────────
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -62,7 +45,6 @@ function jitterDelay() {
   return sleep(ms);
 }
 
-// ─── Baileys socket ───────────────────────────────────────────────────────────
 let sock = null;
 let isConnected = false;
 let reconnectAttempts = 0;
@@ -83,7 +65,7 @@ async function connectToWhatsApp() {
       creds: state.creds,
       keys:  makeCacheableSignalKeyStore(state.keys, console),
     },
-    printQRInTerminal: false, // we print it ourselves via qrcode-terminal
+    printQRInTerminal: false,
     browser: ['Reminder Service', 'Chrome', '1.0.0'],
   });
 
@@ -92,14 +74,18 @@ async function connectToWhatsApp() {
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
-    // Print QR for first-time auth
     if (qr) {
-      console.log('\n[WhatsApp] Scan this QR code with the business WhatsApp number:');
-      qrcode.generate(qr, { small: true });
+      try {
+        latestQrDataUrl = await qrcode.toDataURL(qr);
+        console.log('[WhatsApp] New QR code generated. Open /qr in your browser to scan!');
+      } catch (err) {
+        console.error('[WhatsApp] Failed to generate QR data URL:', err);
+      }
     }
 
     if (connection === 'open') {
       isConnected      = true;
+      latestQrDataUrl  = null;
       reconnectAttempts = 0;
       console.log('[WhatsApp] ✓ Connected and ready to send messages.');
     }
@@ -113,35 +99,32 @@ async function connectToWhatsApp() {
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
       if (statusCode === DisconnectReason.loggedOut) {
-        console.error('[WhatsApp] ✗ Logged out — QR re-scan required. Deleting old session...');
+        console.error('[WhatsApp] Logged out — deleting session...');
         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-        console.error('[WhatsApp] Session cleared. Restart this service to scan a new QR code.');
-        // Do not reconnect — wait for operator to restart
+        latestQrDataUrl = null;
+        connectToWhatsApp();
         return;
       }
 
       if (shouldReconnect && reconnectAttempts < MAX_RECONNECTS) {
         reconnectAttempts++;
-        const backoffMs = reconnectAttempts * 5000;
-        console.warn(`[WhatsApp] Disconnected (code ${statusCode}). Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECTS} in ${backoffMs / 1000}s...`);
+        const backoffMs = reconnectAttempts * 3000;
+        console.warn(`[WhatsApp] Reconnecting (${reconnectAttempts}/${MAX_RECONNECTS}) in ${backoffMs / 1000}s...`);
         await sleep(backoffMs);
         connectToWhatsApp();
-      } else if (reconnectAttempts >= MAX_RECONNECTS) {
-        console.error(`[WhatsApp] ✗ Failed to reconnect after ${MAX_RECONNECTS} attempts. Email & SMS reminders are unaffected. Restart this service manually.`);
-        isConnected = false;
+      } else {
+        console.error('[WhatsApp] Max reconnects reached. Restarting socket...');
+        reconnectAttempts = 0;
+        await sleep(5000);
+        connectToWhatsApp();
       }
     }
   });
 }
 
-// ─── Express HTTP server ──────────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
 
-/**
- * GET /health
- * Quick health check for Railway / uptime monitors.
- */
 app.get('/health', (_req, res) => {
   res.json({
     ok: true,
@@ -153,73 +136,88 @@ app.get('/health', (_req, res) => {
 });
 
 /**
- * POST /send
- * Body: { phone: "919876543210", message: "Your appointment is tomorrow..." }
- * phone should be in E.164 format (with country code, no +).
- * The reminder-service will call this endpoint.
+ * GET /qr
+ * Displays a clean webpage with an image QR code for scanning.
  */
+app.get('/qr', (_req, res) => {
+  if (isConnected) {
+    return res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
+          <h2 style="color: #22c55e;">✓ WhatsApp is Connected & Ready!</h2>
+          <p>Your session is active. No QR scan needed.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  if (!latestQrDataUrl) {
+    return res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
+          <h2>Generating QR Code...</h2>
+          <p>Please refresh this page in 5 seconds.</p>
+          <script>setTimeout(() => location.reload(), 5000);</script>
+        </body>
+      </html>
+    `);
+  }
+
+  res.send(`
+    <html>
+      <body style="font-family: sans-serif; text-align: center; padding-top: 40px; background: #f8fafc;">
+        <h1 style="color: #0f172a;">Scan with WhatsApp</h1>
+        <p style="color: #475569;">Open WhatsApp on your phone → Linked Devices → Link a Device</p>
+        <div style="background: white; display: inline-block; padding: 20px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+          <img src="${latestQrDataUrl}" style="width: 300px; height: 300px;" />
+        </div>
+        <p style="color: #94a3b8; font-size: 0.875rem; margin-top: 20px;">Page auto-refreshes every 15 seconds for fresh QR codes.</p>
+        <script>setTimeout(() => location.reload(), 15000);</script>
+      </body>
+    </html>
+  `);
+});
+
 app.post('/send', async (req, res) => {
   if (!WHATSAPP_ENABLED) {
     return res.json({ ok: false, reason: 'WHATSAPP_ENABLED is false' });
   }
 
   if (!isConnected || !sock) {
-    console.error('[WhatsApp] /send called but socket is not connected.');
     return res.status(503).json({ ok: false, reason: 'WhatsApp socket not connected' });
   }
 
   const { phone, message } = req.body;
-
   if (!phone || !message) {
-    return res.status(400).json({ ok: false, reason: 'phone and message are required' });
+    return res.status(400).json({ ok: false, reason: 'phone and message required' });
   }
 
-  // Normalise phone → strip non-digits, ensure country code
   const normalised = phone.replace(/\D/g, '');
   if (normalised.length < 10) {
-    return res.status(400).json({ ok: false, reason: `Invalid phone number: ${phone}` });
+    return res.status(400).json({ ok: false, reason: `Invalid phone: ${phone}` });
   }
 
-  // Check daily limit
   if (!checkAndIncrementDailyCount()) {
-    console.warn(`[WhatsApp] Daily send limit of ${DAILY_LIMIT} reached. Message to ${normalised} not sent.`);
-    return res.status(429).json({ ok: false, reason: 'Daily send limit reached', limit: DAILY_LIMIT });
+    return res.status(429).json({ ok: false, reason: 'Daily send limit reached' });
   }
 
   const jid = `${normalised}@s.whatsapp.net`;
 
   try {
-    // Jitter delay before each send to avoid spam detection
     await jitterDelay();
-
     await sock.sendMessage(jid, { text: message });
-    console.log(`[WhatsApp] ✓ Message sent to ${normalised} (daily count: ${dailySendCount}/${DAILY_LIMIT})`);
-    return res.json({ ok: true, phone: normalised, dailySendCount });
+    console.log(`[WhatsApp] ✓ Message sent to ${normalised}`);
+    return res.json({ ok: true, phone: normalised });
   } catch (err) {
-    console.error(`[WhatsApp] ✗ Failed to send to ${normalised}:`, err.message);
-    dailySendCount = Math.max(0, dailySendCount - 1); // roll back count on failure
+    console.error(`[WhatsApp] Failed to send to ${normalised}:`, err.message);
+    dailySendCount = Math.max(0, dailySendCount - 1);
     return res.status(500).json({ ok: false, reason: err.message });
   }
 });
 
-// ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`[WhatsApp] HTTP server listening on port ${PORT}`);
+  console.log(`[WhatsApp] Server listening on port ${PORT}`);
   if (WHATSAPP_ENABLED) {
-    console.log('[WhatsApp] Initialising Baileys connection...');
-    connectToWhatsApp().catch((err) => {
-      console.error('[WhatsApp] Fatal error during initialisation:', err);
-    });
-  } else {
-    console.log('[WhatsApp] WHATSAPP_ENABLED=false — Baileys not started. /send will return disabled.');
+    connectToWhatsApp().catch((err) => console.error('Init error:', err));
   }
-});
-
-// ─── Graceful shutdown ────────────────────────────────────────────────────────
-process.on('SIGTERM', async () => {
-  console.log('[WhatsApp] SIGTERM received — shutting down gracefully...');
-  if (sock) {
-    try { await sock.logout(); } catch (_) { /* ignore */ }
-  }
-  process.exit(0);
 });
