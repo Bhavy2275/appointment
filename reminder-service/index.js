@@ -6,7 +6,7 @@ const axios = require('axios');
 // ─── Configuration ────────────────────────────────────────────────────────────
 const connectionString        = process.env.DATABASE_URL;
 const resendApiKey            = process.env.RESEND_API_KEY;
-const reminderHours           = parseInt(process.env.REMINDER_HOURS_BEFORE || '24', 10);
+const reminderHours           = parseInt(process.env.REMINDER_HOURS_BEFORE || '48', 10);
 const businessName            = process.env.NEXT_PUBLIC_BUSINESS_NAME || 'Aura Wellness';
 const fromEmail               = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
