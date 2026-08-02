@@ -285,14 +285,15 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
     }
 
     // 6. Send INSTANT SMS confirmation (Fast2SMS)
-    if (process.env.SMS_ENABLED === 'true' && process.env.FAST2SMS_API_KEY) {
+    const isSmsEnabled = String(process.env.SMS_ENABLED || '').toLowerCase().trim() === 'true';
+    if (isSmsEnabled && process.env.FAST2SMS_API_KEY) {
       try {
         const phone10 = (input.phone || '').replace(/\D/g, '').slice(-10);
         if (phone10.length === 10) {
           const smsMsg = encodeURIComponent(`Confirmed: Your appointment with ${businessName} is set for ${dateFormatted} at ${timeFormatted}. Thank you!`);
           const smsUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${process.env.FAST2SMS_API_KEY}&variables_values=${smsMsg}&route=q&numbers=${phone10}`;
-          await fetch(smsUrl);
-          console.log(`[Instant Confirmation] SMS sent to ${phone10}.`);
+          const res = await fetch(smsUrl);
+          console.log(`[Instant Confirmation] SMS sent to ${phone10}. Status: ${res.status}`);
         }
       } catch (err: any) {
         console.error('[Instant Confirmation] SMS send error:', err.message);
@@ -300,19 +301,21 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
     }
 
     // 7. Send INSTANT WhatsApp confirmation (via whatsapp-service)
-    if (process.env.WHATSAPP_ENABLED === 'true') {
+    const isWaEnabled = String(process.env.WHATSAPP_ENABLED || '').toLowerCase().trim() === 'true';
+    if (isWaEnabled) {
       try {
         const rawPhone = (input.phone || '').replace(/\D/g, '');
         if (rawPhone) {
           const rawUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
           const waUrl = rawUrl.trim().replace(/^["']|["']$/g, '');
           const waMsg = `Hi ${input.name}, your appointment with ${businessName} has been confirmed for ${dateFormatted} at ${timeFormatted}. Location: ${businessLocation}. We look forward to seeing you!`;
-          await fetch(`${waUrl}/send`, {
+          const res = await fetch(`${waUrl}/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ phone: rawPhone, message: waMsg }),
           });
-          console.log(`[Instant Confirmation] WhatsApp request sent to ${rawPhone}.`);
+          const text = await res.text();
+          console.log(`[Instant Confirmation] WhatsApp request sent to ${rawPhone}. Status: ${res.status}, Response: ${text}`);
         }
       } catch (err: any) {
         console.error('[Instant Confirmation] WhatsApp send error:', err.message);
