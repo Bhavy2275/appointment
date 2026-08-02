@@ -304,7 +304,8 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
       try {
         const rawPhone = (input.phone || '').replace(/\D/g, '');
         if (rawPhone) {
-          const waUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
+          const rawUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
+          const waUrl = rawUrl.trim().replace(/^["']|["']$/g, '');
           const waMsg = `Hi ${input.name}, your appointment with ${businessName} has been confirmed for ${dateFormatted} at ${timeFormatted}. Location: ${businessLocation}. We look forward to seeing you!`;
           await fetch(`${waUrl}/send`, {
             method: 'POST',
