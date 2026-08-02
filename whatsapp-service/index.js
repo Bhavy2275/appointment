@@ -14,7 +14,7 @@ const fs        = require('fs');
 const { Boom }  = require('@hapi/boom');
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const PORT              = parseInt(process.env.WHATSAPP_PORT || process.env.PORT || '3001', 10);
+const PORT              = parseInt(process.env.PORT || process.env.WHATSAPP_PORT || '3001', 10);
 const WHATSAPP_ENABLED  = process.env.WHATSAPP_ENABLED === 'true';
 const DAILY_LIMIT       = parseInt(process.env.WHATSAPP_DAILY_SEND_LIMIT || '200', 10);
 const AUTH_DIR          = path.join(__dirname, 'auth_info_baileys');
