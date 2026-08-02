@@ -1,0 +1,8 @@
+# WhatsApp session credentials — NEVER commit these
+auth_info_baileys/
+
+# Dependencies
+node_modules/
+
+# Local env overrides
+.env

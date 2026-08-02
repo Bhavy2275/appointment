@@ -1,0 +1,16 @@
+{
+  "name": "appointment-whatsapp-service",
+  "version": "1.0.0",
+  "description": "Always-on WhatsApp sender using Baileys — run as a separate Railway service alongside the reminder cron",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.16",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
