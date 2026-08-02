@@ -266,9 +266,9 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
           subject: `Appointment Confirmed - ${businessName}`,
           html: emailHtml,
         });
-        console.log('Confirmation email sent successfully via Gmail SMTP.');
-      } catch (smtpErr) {
-        console.error('Failed to send confirmation email via Gmail SMTP:', smtpErr);
+        console.log(`[Instant Confirmation] Email sent via Gmail SMTP.`);
+      } catch (err) {
+        console.error('[Instant Confirmation] Failed to send email via SMTP:', err);
       }
     } else if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_dummy_key') {
       try {
@@ -278,9 +278,48 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
           subject: `Appointment Confirmed - ${businessName}`,
           html: emailHtml,
         });
-        console.log('Confirmation email sent successfully via Resend.');
-      } catch (emailErr) {
-        console.error('Failed to send confirmation email via Resend:', emailErr);
+        console.log(`[Instant Confirmation] Email sent via Resend.`);
+      } catch (err) {
+        console.error('[Instant Confirmation] Failed to send email via Resend:', err);
+      }
+    }
+
+    // 6. Send INSTANT SMS confirmation (Fast2SMS)
+    if (process.env.SMS_ENABLED === 'true' && process.env.FAST2SMS_API_KEY) {
+      try {
+        const phone10 = (input.phone || '').replace(/\D/g, '').slice(-10);
+        if (phone10.length === 10) {
+          const smsMsg = `Confirmed: Your appointment with ${businessName} is set for ${dateFormatted} at ${timeFormatted}. Thank you!`;
+          const axios = require('axios');
+          await axios.get('https://www.fast2sms.com/dev/bulkV2', {
+            params: {
+              authorization: process.env.FAST2SMS_API_KEY,
+              variables_values: smsMsg,
+              route: 'q',
+              numbers: phone10,
+            },
+            timeout: 5000,
+          });
+          console.log(`[Instant Confirmation] SMS sent to ${phone10}.`);
+        }
+      } catch (err: any) {
+        console.error('[Instant Confirmation] SMS send error:', err.message);
+      }
+    }
+
+    // 7. Send INSTANT WhatsApp confirmation (via whatsapp-service)
+    if (process.env.WHATSAPP_ENABLED === 'true') {
+      try {
+        const rawPhone = (input.phone || '').replace(/\D/g, '');
+        if (rawPhone) {
+          const waUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
+          const waMsg = `Hi ${input.name}, your appointment with ${businessName} has been confirmed for ${dateFormatted} at ${timeFormatted}. Location: ${businessLocation}. We look forward to seeing you!`;
+          const axios = require('axios');
+          await axios.post(`${waUrl}/send`, { phone: rawPhone, message: waMsg }, { timeout: 5000 });
+          console.log(`[Instant Confirmation] WhatsApp sent to ${rawPhone}.`);
+        }
+      } catch (err: any) {
+        console.error('[Instant Confirmation] WhatsApp send error:', err.message);
       }
     }
 
