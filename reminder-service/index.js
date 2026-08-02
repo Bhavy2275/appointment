@@ -49,22 +49,25 @@ async function sendSms(appointment, dateFormatted, timeFormatted) {
     const data = response.data;
     if (data && data.return === true) {
       console.log(`[SMS] ✓ Sent to ${phone}. Request ID: ${data.request_id}`);
+      return true;
     } else {
       console.error(`[SMS] ✗ Fast2SMS returned an error for ${phone}:`, JSON.stringify(data));
+      return false;
     }
   } catch (err) {
     console.error(`[SMS] ✗ Failed to send SMS for appointment ${appointment.id}:`, err.message);
+    return false;
   }
 }
 
 // ─── WhatsApp sender (via always-on whatsapp-service) ─────────────────────────
 async function sendWhatsApp(appointment, dateFormatted, timeFormatted) {
-  if (!whatsappEnabled) return;
+  if (!whatsappEnabled) return false;
 
   const phone = (appointment.customer_phone || '').replace(/\D/g, '');
   if (!phone) {
     console.warn(`[WhatsApp] Skipped for appointment ${appointment.id}: no phone number.`);
-    return;
+    return false;
   }
 
   const message =
@@ -79,8 +82,10 @@ async function sendWhatsApp(appointment, dateFormatted, timeFormatted) {
 
     if (response.data && response.data.ok) {
       console.log(`[WhatsApp] ✓ Message queued for ${phone}.`);
+      return true;
     } else {
       console.warn(`[WhatsApp] ✗ Service responded with:`, JSON.stringify(response.data));
+      return false;
     }
   } catch (err) {
     if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
@@ -88,6 +93,7 @@ async function sendWhatsApp(appointment, dateFormatted, timeFormatted) {
     } else {
       console.error(`[WhatsApp] ✗ Failed for appointment ${appointment.id}:`, err.message);
     }
+    return false;
   }
 }
 
@@ -149,8 +155,8 @@ async function run() {
         `\nProcessing appointment ${appointment.id} — ${appointment.customer_name} (${appointment.customer_email}) on ${dateFormatted} at ${timeFormatted}`
       );
 
-      // ── 1. EMAIL (primary — always fires) ──────────────────────────────────
-      let emailSent = false;
+      // ── 1. EMAIL (primary) ────────────────────────────────────────────────
+      let anyChannelSucceeded = false;
       try {
         const emailHtml = `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
@@ -195,6 +201,7 @@ async function run() {
             html: emailHtml,
           });
           console.log(`[Email] ✓ Sent via Gmail SMTP.`);
+          anyChannelSucceeded = true;
         } else if (resendApiKey && resendApiKey !== 're_dummy_key') {
           await resend.emails.send({
             from: `${businessName} <${fromEmail}>`,
@@ -203,20 +210,26 @@ async function run() {
             html: emailHtml,
           });
           console.log(`[Email] ✓ Sent via Resend.`);
+          anyChannelSucceeded = true;
         }
-        emailSent = true;
       } catch (err) {
         console.error(`[Email] ✗ Failed for appointment ${appointment.id}:`, err.message);
       }
 
       // ── 2. SMS (optional — never blocks email or WhatsApp) ─────────────────
-      await sendSms(appointment, dateFormatted, timeFormatted);
+      try {
+        const smsResult = await sendSms(appointment, dateFormatted, timeFormatted);
+        if (smsResult) anyChannelSucceeded = true;
+      } catch (_) {}
 
       // ── 3. WhatsApp (optional — never blocks email or SMS) ─────────────────
-      await sendWhatsApp(appointment, dateFormatted, timeFormatted);
+      try {
+        const waResult = await sendWhatsApp(appointment, dateFormatted, timeFormatted);
+        if (waResult) anyChannelSucceeded = true;
+      } catch (_) {}
 
-      // ── Mark reminder sent if email (primary) succeeded ────────────────────
-      if (emailSent) {
+      // ── Mark reminder sent if ANY channel succeeded ───────────────────────
+      if (anyChannelSucceeded) {
         try {
           await client.query(
             'UPDATE appointments SET reminder_sent = TRUE WHERE id = $1',
@@ -227,7 +240,7 @@ async function run() {
           console.error(`[DB] ✗ Failed to update reminder_sent for appointment ${appointment.id}:`, err.message);
         }
       } else {
-        console.warn(`[DB] Skipping reminder_sent update for ${appointment.id} — email did not confirm success.`);
+        console.warn(`[DB] Skipping reminder_sent update for ${appointment.id} — no channels confirmed success.`);
       }
     }
 
