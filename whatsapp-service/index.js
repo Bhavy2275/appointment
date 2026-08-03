@@ -147,7 +147,10 @@ app.get('/logout', async (_req, res) => {
       try { sock.end(undefined); } catch (_) {}
     }
     if (fs.existsSync(AUTH_DIR)) {
-      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+      const files = fs.readdirSync(AUTH_DIR);
+      for (const file of files) {
+        fs.rmSync(path.join(AUTH_DIR, file), { recursive: true, force: true });
+      }
     }
     console.log('[WhatsApp] Session reset requested. Initialising clean connection...');
     setTimeout(() => {
