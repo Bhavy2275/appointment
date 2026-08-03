@@ -70,15 +70,8 @@ async function sendWhatsApp(appointment, phone, dateFormatted, timeFormatted) {
     return false;
   }
 
-  // Calculate the 15-minute slot range end time
-  const slotDate = new Date(appointment.slot_time);
-  const slotEndDate = new Date(slotDate.getTime() + 15 * 60 * 1000);
-  const startTimeFormatted = slotDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  const endTimeFormatted = slotEndDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  const timeRangeStr = `${startTimeFormatted} - ${endTimeFormatted}`;
-
   const message =
-    `Hi ${appointment.customer_name}, this is a reminder that your session is in 5 minutes! Your appointment with ${businessName} is scheduled on ${dateFormatted} at ${timeRangeStr}. See you soon!`;
+    `Hi ${appointment.customer_name}, this is a reminder that your session is in 5 minutes! Your appointment with ${businessName} is scheduled on ${dateFormatted} at ${timeFormatted}. See you soon!`;
 
   try {
     const response = await axios.post(

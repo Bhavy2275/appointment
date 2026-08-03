@@ -91,7 +91,39 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       return;
     }
 
-    const localDate = new Date(`${singleDate}T${singleTime}:00`);
+    // Robust parsing of date and time strings
+    let localDate: Date;
+    const timeClean = singleTime.trim();
+    
+    // Matches "14:15", "2:15 PM", "14.15", "2.15 PM", etc.
+    const timeMatch = timeClean.match(/^(\d{1,2})[:.](\d{2})(?:\s*(AM|PM))?$/i);
+    
+    if (timeMatch) {
+      let hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      const ampm = timeMatch[3];
+      
+      if (ampm) {
+        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+      }
+      
+      const parts = singleDate.split('-');
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // 0-based
+      const day = parseInt(parts[2], 10);
+      
+      localDate = new Date(year, month, day, hours, minutes, 0);
+    } else {
+      // Fallback to standard parsing
+      localDate = new Date(`${singleDate}T${singleTime}:00`);
+    }
+
+    if (isNaN(localDate.getTime())) {
+      showNotification('error', 'Invalid date or time value. Use HH:MM format.');
+      return;
+    }
+
     const dateTimeStr = localDate.toISOString();
     startTransition(async () => {
       const result = await createTimeSlots([dateTimeStr]);
