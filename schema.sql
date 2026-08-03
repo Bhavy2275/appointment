@@ -25,20 +25,32 @@ ON appointments(slot_time)
 WHERE status IN ('booked', 'completed', 'no-show');
 
 -- 4. Dynamic Seed Data for testing (adds slots starting tomorrow)
--- This adds slots for tomorrow at 9 AM, 10 AM, 11 AM, 2 PM, 3 PM, 4 PM
+-- This adds slots for tomorrow between 10 PM and 10 AM the next day (15-min intervals)
 INSERT INTO time_slots (slot_time)
 VALUES 
-  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '9 hours'),
-  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '10 hours'),
-  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '11 hours'),
-  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '14 hours'),
-  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '15 hours'),
-  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '16 hours'),
-  -- Day after tomorrow slots
+  -- Tomorrow 10:00 PM to 11:45 PM slots
+  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '22 hours'),
+  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '22 hours 15 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '22 hours 30 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '22 hours 45 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '23 hours'),
+  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '23 hours 15 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '23 hours 30 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '1 day') + INTERVAL '23 hours 45 minutes'),
+  -- Day after tomorrow 12:00 AM to 10:00 AM slots
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '0 hours'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '0 hours 15 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '0 hours 30 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '0 hours 45 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '1 hours'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '1 hours 15 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '8 hours'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '8 hours 15 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '8 hours 30 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '8 hours 45 minutes'),
   (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '9 hours'),
-  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '10 hours'),
-  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '11 hours'),
-  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '14 hours'),
-  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '15 hours'),
-  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '16 hours')
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '9 hours 15 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '9 hours 30 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '9 hours 45 minutes'),
+  (date_trunc('day', NOW() + INTERVAL '2 days') + INTERVAL '10 hours')
 ON CONFLICT (slot_time) DO NOTHING;

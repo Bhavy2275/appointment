@@ -44,8 +44,8 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   
   // Bulk Slot Create State
   const [bulkDate, setBulkDate] = useState('');
-  const [bulkStart, setBulkStart] = useState('09:00');
-  const [bulkEnd, setBulkEnd] = useState('17:00');
+  const [bulkStart, setBulkStart] = useState('22:00'); // Default to 10 PM
+  const [bulkEnd, setBulkEnd] = useState('10:00');   // Default to 10 AM
   const [bulkInterval, setBulkInterval] = useState('15'); // default to 15 minutes
 
   // Edit Appointment Modal State
@@ -117,22 +117,47 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
     const endMinutes = parseTimeToMinutes(bulkEnd);
     const interval = parseInt(bulkInterval);
 
-    if (startMinutes >= endMinutes) {
-      showNotification('error', 'Start time must be before end time.');
-      return;
-    }
-
     const slotTimes: string[] = [];
-    for (let m = startMinutes; m <= endMinutes; m += interval) {
-      const hours = Math.floor(m / 60).toString().padStart(2, '0');
-      const mins = (m % 60).toString().padStart(2, '0');
-      slotTimes.push(`${bulkDate}T${hours}:${mins}:00`);
+
+    if (startMinutes < endMinutes) {
+      // Normal range within the same calendar day
+      for (let m = startMinutes; m <= endMinutes; m += interval) {
+        const hours = Math.floor(m / 60).toString().padStart(2, '0');
+        const mins = (m % 60).toString().padStart(2, '0');
+        slotTimes.push(`${bulkDate}T${hours}:${mins}:00`);
+      }
+    } else {
+      // Range spans across midnight
+      // 1. From startMinutes up to the end of the first day
+      for (let m = startMinutes; m < 1440; m += interval) {
+        const hours = Math.floor(m / 60).toString().padStart(2, '0');
+        const mins = (m % 60).toString().padStart(2, '0');
+        slotTimes.push(`${bulkDate}T${hours}:${mins}:00`);
+      }
+      
+      // 2. Calculate the next day date
+      const currentDate = new Date(bulkDate + 'T00:00:00');
+      currentDate.setDate(currentDate.getDate() + 1);
+      const nextDayStr = currentDate.toISOString().split('T')[0];
+
+      // Calculate the start offset for the next day, which continues the interval
+      let lastSlotMin = startMinutes;
+      while (lastSlotMin + interval < 1440) {
+        lastSlotMin += interval;
+      }
+      const nextDayStartMin = (lastSlotMin + interval) - 1440;
+
+      for (let m = nextDayStartMin; m <= endMinutes; m += interval) {
+        const hours = Math.floor(m / 60).toString().padStart(2, '0');
+        const mins = (m % 60).toString().padStart(2, '0');
+        slotTimes.push(`${nextDayStr}T${hours}:${mins}:00`);
+      }
     }
 
     startTransition(async () => {
       const result = await createTimeSlots(slotTimes);
       if (result.success) {
-        showNotification('success', `Bulk generated ${result.count} slots for ${bulkDate}`);
+        showNotification('success', `Bulk generated ${result.count} slots starting ${bulkDate}`);
         refreshData();
       } else {
         showNotification('error', result.error || 'Failed to generate slots.');
