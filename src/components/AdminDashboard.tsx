@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Calendar, Clock, User, Mail, Phone, MessageSquare, 
   Trash2, Check, X, Edit, Plus, ListFilter, 
@@ -30,6 +31,7 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
+  const router = useRouter();
   const [data, setData] = useState<AdminSlotRow[]>(initialSlots);
   const [activeTab, setActiveTab] = useState<'appointments' | 'slots'>('appointments');
   const [isPending, startTransition] = useTransition();
@@ -132,6 +134,9 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
         setSingleDate('');
         setSingleTime('');
         refreshData();
+      } else if (result.error === 'Unauthorized') {
+        showNotification('error', 'Session expired. Redirecting to login...');
+        setTimeout(() => router.push('/admin/login'), 2000);
       } else {
         showNotification('error', result.error || 'Failed to create slot.');
       }
@@ -294,8 +299,8 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
     });
   };
 
-  const refreshData = async () => {
-    window.location.reload();
+  const refreshData = () => {
+    router.refresh();
   };
 
   // --- FILTERS & COMPUTED ---
