@@ -19,6 +19,7 @@ interface AdminSlotRow {
   customer_name: string | null;
   customer_email: string | null;
   customer_phone: string | null;
+  customer_alternative_phone: string | null;
   service_reason: string | null;
   appointment_status: 'booked' | 'completed' | 'no-show' | 'cancelled' | null;
   reminder_sent: boolean | null;
@@ -45,7 +46,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   const [bulkDate, setBulkDate] = useState('');
   const [bulkStart, setBulkStart] = useState('09:00');
   const [bulkEnd, setBulkEnd] = useState('17:00');
-  const [bulkInterval, setBulkInterval] = useState('60'); // minutes
+  const [bulkInterval, setBulkInterval] = useState('15'); // default to 15 minutes
 
   // Edit Appointment Modal State
   const [editingAppointment, setEditingAppointment] = useState<{
@@ -53,6 +54,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
     name: string;
     email: string;
     phone: string;
+    alternativePhone: string;
     reason: string;
     slot_time: string;
   } | null>(null);
@@ -63,6 +65,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
     name: string;
     email: string;
     phone: string;
+    alternativePhone: string;
     reason: string;
   } | null>(null);
 
@@ -182,8 +185,9 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
     startTransition(async () => {
       const result = await updateAppointmentDetails(editingAppointment.id, {
         name: editingAppointment.name,
-        email: editingAppointment.email,
+        email: editingAppointment.email.trim() || undefined,
         phone: editingAppointment.phone,
+        alternativePhone: editingAppointment.alternativePhone.trim() || undefined,
         reason: editingAppointment.reason,
       });
 
@@ -205,8 +209,9 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
     startTransition(async () => {
       const result = await adminBookAppointment({
         name: manualBooking.name,
-        email: manualBooking.email,
+        email: manualBooking.email.trim() || undefined,
         phone: manualBooking.phone,
+        alternativePhone: manualBooking.alternativePhone.trim() || undefined,
         reason: manualBooking.reason,
         slotTime: manualBooking.slotTime,
       });
@@ -241,7 +246,9 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       const nameMatch = (item.customer_name || '').toLowerCase().includes(search);
       const emailMatch = (item.customer_email || '').toLowerCase().includes(search);
       const phoneMatch = (item.customer_phone || '').toLowerCase().includes(search);
-      return nameMatch || emailMatch || phoneMatch;
+      const altPhoneMatch = (item.customer_alternative_phone || '').toLowerCase().includes(search);
+      const reasonMatch = (item.service_reason || '').toLowerCase().includes(search);
+      return nameMatch || emailMatch || phoneMatch || altPhoneMatch || reasonMatch;
     }
 
     return true;
@@ -383,9 +390,12 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                           {/* Customer */}
                           <td className="py-4 px-6">
                             <div>
-                              <p className="font-semibold text-white">{item.customer_name}</p>
-                              <p className="text-xs text-zinc-500 mt-0.5">{item.customer_email}</p>
-                              <p className="text-xs text-zinc-500 mt-0.5">{item.customer_phone}</p>
+                              <p className="font-semibold text-zinc-200">{item.customer_name}</p>
+                              <p className="text-xs text-zinc-550 mt-0.5">{item.customer_email || <span className="italic text-zinc-600">No email</span>}</p>
+                              <p className="text-xs text-zinc-500 mt-0.5">Primary: {item.customer_phone}</p>
+                              {item.customer_alternative_phone && (
+                                <p className="text-xs text-zinc-500 mt-0.5">Alt: {item.customer_alternative_phone}</p>
+                              )}
                             </div>
                           </td>
                           {/* Date & Time */}
@@ -463,6 +473,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                                   name: item.customer_name || '',
                                   email: item.customer_email || '',
                                   phone: item.customer_phone || '',
+                                  alternativePhone: item.customer_alternative_phone || '',
                                   reason: item.service_reason || '',
                                   slot_time: item.slot_time
                                 })}
@@ -614,13 +625,22 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
               <div className="divide-y divide-zinc-850 max-h-[600px] overflow-y-auto">
                 {data.map((item) => {
                   const dateObj = new Date(item.slot_time);
-                  const formattedDateTime = dateObj.toLocaleString('en-US', {
+                  const endDateObj = new Date(dateObj.getTime() + 15 * 60000);
+                  
+                  const formattedDate = dateObj.toLocaleDateString('en-US', {
                     weekday: 'short',
                     month: 'short',
                     day: 'numeric',
+                  });
+                  const startTimeStr = dateObj.toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
                   });
+                  const endTimeStr = endDateObj.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+                  const formattedDateTime = `${formattedDate} @ ${startTimeStr} - ${endTimeStr}`;
 
                   const isBooked = !!item.appointment_id;
 
@@ -649,6 +669,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                               name: '',
                               email: '',
                               phone: '',
+                              alternativePhone: '',
                               reason: '',
                             })}
                             className="text-xs font-semibold px-2.5 py-1 rounded bg-white text-black hover:bg-zinc-200 transition-all cursor-pointer"
@@ -704,10 +725,9 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Email Address</label>
+                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Email Address <span className="text-zinc-600">(Optional)</span></label>
                 <input
                   type="email"
-                  required
                   value={editingAppointment.email}
                   onChange={(e) => setEditingAppointment({...editingAppointment, email: e.target.value})}
                   className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 text-sm outline-none transition-all"
@@ -721,6 +741,16 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                   required
                   value={editingAppointment.phone}
                   onChange={(e) => setEditingAppointment({...editingAppointment, phone: e.target.value})}
+                  className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 text-sm outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Alternative Phone Number <span className="text-zinc-600">(Optional)</span></label>
+                <input
+                  type="text"
+                  value={editingAppointment.alternativePhone}
+                  onChange={(e) => setEditingAppointment({...editingAppointment, alternativePhone: e.target.value})}
                   className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 text-sm outline-none transition-all"
                 />
               </div>
@@ -788,10 +818,9 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Email Address</label>
+                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Email Address <span className="text-zinc-600">(Optional)</span></label>
                 <input
                   type="email"
-                  required
                   value={manualBooking.email}
                   onChange={(e) => setManualBooking({...manualBooking, email: e.target.value})}
                   placeholder="john@example.com"
@@ -806,6 +835,17 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                   required
                   value={manualBooking.phone}
                   onChange={(e) => setManualBooking({...manualBooking, phone: e.target.value})}
+                  placeholder="555-555-5555"
+                  className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 text-sm outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Alternative Phone Number <span className="text-zinc-600">(Optional)</span></label>
+                <input
+                  type="text"
+                  value={manualBooking.alternativePhone}
+                  onChange={(e) => setManualBooking({...manualBooking, alternativePhone: e.target.value})}
                   placeholder="555-555-5555"
                   className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 text-sm outline-none transition-all"
                 />

@@ -78,6 +78,7 @@ export async function getAdminTimeSlots() {
       a.customer_name, 
       a.customer_email, 
       a.customer_phone, 
+      a.customer_alternative_phone, 
       a.service_reason, 
       a.status as appointment_status, 
       a.reminder_sent
@@ -150,18 +151,21 @@ export async function deleteTimeSlot(id: string): Promise<{ success: boolean; er
 
 export interface BookingInput {
   name: string;
-  email: string;
+  email?: string;
   phone: string;
+  alternativePhone?: string;
   reason?: string;
   slotTime: string; // ISO String
 }
 
 // Customer Booking Server Action
 export async function bookAppointment(input: BookingInput): Promise<{ success: boolean; appointmentId?: string; error?: string }> {
-  // 1. Email verification
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(input.email)) {
-    return { success: false, error: 'Invalid email address format.' };
+  // 1. Email verification (only if email is provided)
+  if (input.email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(input.email)) {
+      return { success: false, error: 'Invalid email address format.' };
+    }
   }
 
   // 2. Block past dates
@@ -188,10 +192,10 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
 
     // 4. Insert booking
     const result = await query(
-      `INSERT INTO appointments (customer_name, customer_email, customer_phone, service_reason, slot_time, status)
-       VALUES ($1, $2, $3, $4, $5, 'booked')
+      `INSERT INTO appointments (customer_name, customer_email, customer_phone, customer_alternative_phone, service_reason, slot_time, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'booked')
        RETURNING id`,
-      [input.name, input.email, input.phone, input.reason || '', input.slotTime]
+      [input.name, input.email || null, input.phone, input.alternativePhone || null, input.reason || '', input.slotTime]
     );
 
     const appointmentId = result.rows[0].id;
@@ -246,79 +250,93 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
       </div>
     `;
 
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    if (input.email) {
+      const smtpUser = process.env.SMTP_USER;
+      const smtpPass = process.env.SMTP_PASS;
 
-    if (smtpUser && smtpPass) {
-      try {
-        const nodemailer = require('nodemailer');
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: {
-            user: smtpUser,
-            pass: smtpPass,
-          },
-        });
+      if (smtpUser && smtpPass) {
+        try {
+          const nodemailer = require('nodemailer');
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+              user: smtpUser,
+              pass: smtpPass,
+            },
+          });
 
-        await transporter.sendMail({
-          from: `"${businessName}" <${smtpUser}>`,
-          to: input.email,
-          subject: `Appointment Confirmed - ${businessName}`,
-          html: emailHtml,
-        });
-        console.log(`[Instant Confirmation] Email sent via Gmail SMTP.`);
-      } catch (err) {
-        console.error('[Instant Confirmation] Failed to send email via SMTP:', err);
-      }
-    } else if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_dummy_key') {
-      try {
-        await resend.emails.send({
-          from: `${businessName} <${fromEmail}>`,
-          to: input.email,
-          subject: `Appointment Confirmed - ${businessName}`,
-          html: emailHtml,
-        });
-        console.log(`[Instant Confirmation] Email sent via Resend.`);
-      } catch (err) {
-        console.error('[Instant Confirmation] Failed to send email via Resend:', err);
+          await transporter.sendMail({
+            from: `"${businessName}" <${smtpUser}>`,
+            to: input.email,
+            subject: `Appointment Confirmed - ${businessName}`,
+            html: emailHtml,
+          });
+          console.log(`[Instant Confirmation] Email sent via Gmail SMTP.`);
+        } catch (err) {
+          console.error('[Instant Confirmation] Failed to send email via SMTP:', err);
+        }
+      } else if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_dummy_key') {
+        try {
+          await resend.emails.send({
+            from: `${businessName} <${fromEmail}>`,
+            to: input.email,
+            subject: `Appointment Confirmed - ${businessName}`,
+            html: emailHtml,
+          });
+          console.log(`[Instant Confirmation] Email sent via Resend.`);
+        } catch (err) {
+          console.error('[Instant Confirmation] Failed to send email via Resend:', err);
+        }
       }
     }
 
     // 6. Send INSTANT SMS confirmation (Fast2SMS)
     const isSmsEnabled = String(process.env.SMS_ENABLED || '').toLowerCase().trim() === 'true';
     if (isSmsEnabled && process.env.FAST2SMS_API_KEY) {
-      try {
-        const phone10 = (input.phone || '').replace(/\D/g, '').slice(-10);
-        if (phone10.length === 10) {
-          const smsMsg = encodeURIComponent(`Confirmed: Your appointment with ${businessName} is set for ${dateFormatted} at ${timeFormatted}. Thank you!`);
-          const smsUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${process.env.FAST2SMS_API_KEY}&variables_values=${smsMsg}&route=q&numbers=${phone10}`;
-          const res = await fetch(smsUrl);
-          console.log(`[Instant Confirmation] SMS sent to ${phone10}. Status: ${res.status}`);
+      const smsMsg = encodeURIComponent(`Confirmed: Your appointment with ${businessName} is set for ${dateFormatted} at ${timeFormatted}. Thank you!`);
+      const sendSingleSms = async (targetPhone: string) => {
+        try {
+          const phone10 = (targetPhone || '').replace(/\D/g, '').slice(-10);
+          if (phone10.length === 10) {
+            const smsUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${process.env.FAST2SMS_API_KEY}&variables_values=${smsMsg}&route=q&numbers=${phone10}`;
+            const res = await fetch(smsUrl);
+            console.log(`[Instant Confirmation] SMS sent to ${phone10}. Status: ${res.status}`);
+          }
+        } catch (err: any) {
+          console.error('[Instant Confirmation] SMS send error:', err.message);
         }
-      } catch (err: any) {
-        console.error('[Instant Confirmation] SMS send error:', err.message);
+      };
+      await sendSingleSms(input.phone);
+      if (input.alternativePhone) {
+        await sendSingleSms(input.alternativePhone);
       }
     }
 
     // 7. Send INSTANT WhatsApp confirmation (via whatsapp-service)
     const isWaEnabled = String(process.env.WHATSAPP_ENABLED || '').toLowerCase().trim() === 'true';
     if (isWaEnabled) {
-      try {
-        const rawPhone = (input.phone || '').replace(/\D/g, '');
-        if (rawPhone) {
-          const rawUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
-          const waUrl = rawUrl.trim().replace(/^["']|["']$/g, '');
-          const waMsg = `Hi ${input.name}, your appointment with ${businessName} has been confirmed for ${dateFormatted} at ${timeFormatted}. Location: ${businessLocation}. We look forward to seeing you!`;
-          const res = await fetch(`${waUrl}/send`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: rawPhone, message: waMsg }),
-          });
-          const text = await res.text();
-          console.log(`[Instant Confirmation] WhatsApp request sent to ${rawPhone}. Status: ${res.status}, Response: ${text}`);
+      const rawUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
+      const waUrl = rawUrl.trim().replace(/^["']|["']$/g, '');
+      const waMsg = `Hi ${input.name}, your appointment with ${businessName} has been confirmed for ${dateFormatted} at ${timeFormatted}. Location: ${businessLocation}. We look forward to seeing you!`;
+      const sendSingleWa = async (targetPhone: string) => {
+        try {
+          const rawPhone = (targetPhone || '').replace(/\D/g, '');
+          if (rawPhone) {
+            const res = await fetch(`${waUrl}/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: rawPhone, message: waMsg }),
+            });
+            const text = await res.text();
+            console.log(`[Instant Confirmation] WhatsApp request sent to ${rawPhone}. Status: ${res.status}, Response: ${text}`);
+          }
+        } catch (err: any) {
+          console.error('[Instant Confirmation] WhatsApp send error:', err.message);
         }
-      } catch (err: any) {
-        console.error('[Instant Confirmation] WhatsApp send error:', err.message);
+      };
+      await sendSingleWa(input.phone);
+      if (input.alternativePhone) {
+        await sendSingleWa(input.alternativePhone);
       }
     }
 
@@ -362,17 +380,19 @@ export async function updateAppointmentDetails(
   const auth = await checkAdminAuth();
   if (!auth) return { success: false, error: 'Unauthorized' };
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(input.email)) {
-    return { success: false, error: 'Invalid email address format.' };
+  if (input.email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(input.email)) {
+      return { success: false, error: 'Invalid email address format.' };
+    }
   }
 
   try {
     await query(
       `UPDATE appointments 
-       SET customer_name = $1, customer_email = $2, customer_phone = $3, service_reason = $4
-       WHERE id = $5`,
-      [input.name, input.email, input.phone, input.reason || '', id]
+       SET customer_name = $1, customer_email = $2, customer_phone = $3, customer_alternative_phone = $4, service_reason = $5
+       WHERE id = $6`,
+      [input.name, input.email || null, input.phone, input.alternativePhone || null, input.reason || '', id]
     );
     revalidatePath('/admin');
     return { success: true };
@@ -398,10 +418,10 @@ export async function adminBookAppointment(
 
     // Create booking
     const result = await query(
-      `INSERT INTO appointments (customer_name, customer_email, customer_phone, service_reason, slot_time, status)
-       VALUES ($1, $2, $3, $4, $5, 'booked')
+      `INSERT INTO appointments (customer_name, customer_email, customer_phone, customer_alternative_phone, service_reason, slot_time, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'booked')
        RETURNING id`,
-      [input.name, input.email, input.phone, input.reason || '', input.slotTime]
+      [input.name, input.email || null, input.phone, input.alternativePhone || null, input.reason || '', input.slotTime]
     );
 
     revalidatePath('/');

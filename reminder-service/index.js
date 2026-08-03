@@ -61,27 +61,34 @@ async function sendSms(appointment, dateFormatted, timeFormatted) {
 }
 
 // ─── WhatsApp sender (via always-on whatsapp-service) ─────────────────────────
-async function sendWhatsApp(appointment, dateFormatted, timeFormatted) {
+async function sendWhatsApp(appointment, phone, dateFormatted, timeFormatted) {
   if (!whatsappEnabled) return false;
 
-  const phone = (appointment.customer_phone || '').replace(/\D/g, '');
-  if (!phone) {
+  const normalisedPhone = (phone || '').replace(/\D/g, '');
+  if (!normalisedPhone) {
     console.warn(`[WhatsApp] Skipped for appointment ${appointment.id}: no phone number.`);
     return false;
   }
 
+  // Calculate the 15-minute slot range end time
+  const slotDate = new Date(appointment.slot_time);
+  const slotEndDate = new Date(slotDate.getTime() + 15 * 60 * 1000);
+  const startTimeFormatted = slotDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const endTimeFormatted = slotEndDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const timeRangeStr = `${startTimeFormatted} - ${endTimeFormatted}`;
+
   const message =
-    `Hi ${appointment.customer_name}, this is a reminder for your upcoming appointment with ${businessName} on ${dateFormatted} at ${timeFormatted}. See you soon!`;
+    `Hi ${appointment.customer_name}, this is a reminder that your session is in 5 minutes! Your appointment with ${businessName} is scheduled on ${dateFormatted} at ${timeRangeStr}. See you soon!`;
 
   try {
     const response = await axios.post(
       `${whatsappServiceUrl}/send`,
-      { phone, message },
+      { phone: normalisedPhone, message },
       { timeout: 15000 }
     );
 
     if (response.data && response.data.ok) {
-      console.log(`[WhatsApp] ✓ Message queued for ${phone}.`);
+      console.log(`[WhatsApp] ✓ Message queued for ${normalisedPhone}.`);
       return true;
     } else {
       console.warn(`[WhatsApp] ✗ Service responded with:`, JSON.stringify(response.data));
@@ -89,11 +96,80 @@ async function sendWhatsApp(appointment, dateFormatted, timeFormatted) {
     }
   } catch (err) {
     if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
-      console.error(`[WhatsApp] ✗ whatsapp-service is unreachable at ${whatsappServiceUrl}. Is it running? (email/SMS not affected)`);
+      console.error(`[WhatsApp] ✗ whatsapp-service is unreachable at ${whatsappServiceUrl}. Is it running?`);
     } else {
-      console.error(`[WhatsApp] ✗ Failed for appointment ${appointment.id}:`, err.message);
+      console.error(`[WhatsApp] ✗ Failed for appointment ${appointment.id} phone ${normalisedPhone}:`, err.message);
     }
     return false;
+  }
+}
+
+// ─── WhatsApp 5-Minute Reminder checker ────────────────────────────────────────
+async function sendFiveMinuteWhatsAppReminders(client) {
+  if (!whatsappEnabled) return;
+
+  console.log('\n--- Checking for upcoming 5-minute WhatsApp reminders ---');
+
+  try {
+    // Select appointments starting in the next 6 minutes that haven't received WhatsApp reminders yet
+    const queryText = `
+      SELECT 
+        id, 
+        customer_name, 
+        customer_phone, 
+        customer_alternative_phone, 
+        slot_time
+      FROM appointments
+      WHERE status = 'booked'
+        AND whatsapp_reminder_sent = FALSE
+        AND slot_time > NOW()
+        AND slot_time <= NOW() + INTERVAL '6 minutes'
+      ORDER BY slot_time ASC
+    `;
+    const result = await client.query(queryText);
+
+    console.log(`Found ${result.rows.length} pending 5-minute WhatsApp reminders.`);
+
+    for (const appointment of result.rows) {
+      const slotDate = new Date(appointment.slot_time);
+      const dateFormatted = slotDate.toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      });
+      const timeFormatted = slotDate.toLocaleTimeString('en-US', {
+        hour: '2-digit', minute: '2-digit',
+      });
+
+      console.log(`\nSending 5-min WhatsApp reminder for appointment ${appointment.id} — ${appointment.customer_name}`);
+
+      let sentSuccessfully = false;
+
+      // Send to primary phone
+      const primarySent = await sendWhatsApp(appointment, appointment.customer_phone, dateFormatted, timeFormatted);
+      if (primarySent) {
+        sentSuccessfully = true;
+      }
+
+      // Send to alternative phone if provided
+      if (appointment.customer_alternative_phone && appointment.customer_alternative_phone.trim() !== '') {
+        console.log(`Sending WhatsApp reminder to alternative number: ${appointment.customer_alternative_phone}`);
+        const altSent = await sendWhatsApp(appointment, appointment.customer_alternative_phone, dateFormatted, timeFormatted);
+        if (altSent) {
+          sentSuccessfully = true;
+        }
+      }
+
+      if (sentSuccessfully) {
+        await client.query(
+          'UPDATE appointments SET whatsapp_reminder_sent = TRUE WHERE id = $1',
+          [appointment.id]
+        );
+        console.log(`[DB] ✓ whatsapp_reminder_sent = TRUE for appointment ${appointment.id}`);
+      } else {
+        console.warn(`[DB] Skipping whatsapp_reminder_sent update for ${appointment.id} — send failed.`);
+      }
+    }
+  } catch (err) {
+    console.error('Error in sendFiveMinuteWhatsAppReminders:', err.message);
   }
 }
 
@@ -124,6 +200,10 @@ async function run() {
     await client.connect();
     console.log('Successfully connected to the database.');
 
+    // 1. Run 5-minute WhatsApp reminders
+    await sendFiveMinuteWhatsAppReminders(client);
+
+    // 2. Run long-term reminders (Email/SMS)
     const queryText = `
       SELECT 
         id, 
@@ -140,92 +220,92 @@ async function run() {
     `;
     const result = await client.query(queryText, [reminderHours]);
 
-    console.log(`Found ${result.rows.length} pending appointment reminders.`);
+    console.log(`\nFound ${result.rows.length} pending long-term email/SMS reminders.`);
 
     for (const appointment of result.rows) {
       const slotDate     = new Date(appointment.slot_time);
+      const slotEndDate  = new Date(slotDate.getTime() + 15 * 60 * 1000);
       const dateFormatted = slotDate.toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       });
-      const timeFormatted = slotDate.toLocaleTimeString('en-US', {
-        hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
-      });
+      
+      const startTimeFormatted = slotDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const endTimeFormatted = slotEndDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+      const timeFormatted = `${startTimeFormatted} - ${endTimeFormatted}`;
 
       console.log(
-        `\nProcessing appointment ${appointment.id} — ${appointment.customer_name} (${appointment.customer_email}) on ${dateFormatted} at ${timeFormatted}`
+        `\nProcessing appointment ${appointment.id} — ${appointment.customer_name} (${appointment.customer_email || 'No email'}) on ${dateFormatted} at ${timeFormatted}`
       );
 
       // ── 1. EMAIL (primary) ────────────────────────────────────────────────
       let anyChannelSucceeded = false;
-      try {
-        const emailHtml = `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-            <h2 style="color: #4f46e5; margin-top: 0;">Appointment Reminder</h2>
-            <p>Hi <strong>${appointment.customer_name}</strong>,</p>
-            <p>This is a reminder for your upcoming appointment with <strong>${businessName}</strong>.</p>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr>
-                <td style="padding: 8px 0; color: #64748b;"><strong>Business:</strong></td>
-                <td style="padding: 8px 0;">${businessName}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #64748b;"><strong>Date:</strong></td>
-                <td style="padding: 8px 0;">${dateFormatted}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 0; color: #64748b;"><strong>Time:</strong></td>
-                <td style="padding: 8px 0;">${timeFormatted}</td>
-              </tr>
-            </table>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <p style="font-size: 0.875rem; color: #64748b; margin-bottom: 0;">
-              If you need to reschedule or cancel, please contact us. We look forward to seeing you soon!
-            </p>
-          </div>
-        `;
+      if (appointment.customer_email && appointment.customer_email.trim() !== '') {
+        try {
+          const emailHtml = `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <h2 style="color: #4f46e5; margin-top: 0;">Appointment Reminder</h2>
+              <p>Hi <strong>${appointment.customer_name}</strong>,</p>
+              <p>This is a reminder for your upcoming appointment with <strong>${businessName}</strong>.</p>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;"><strong>Business:</strong></td>
+                  <td style="padding: 8px 0;">${businessName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;"><strong>Date:</strong></td>
+                  <td style="padding: 8px 0;">${dateFormatted}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;"><strong>Time:</strong></td>
+                  <td style="padding: 8px 0;">${timeFormatted}</td>
+                </tr>
+              </table>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+              <p style="font-size: 0.875rem; color: #64748b; margin-bottom: 0;">
+                If you need to reschedule or cancel, please contact us. We look forward to seeing you soon!
+              </p>
+            </div>
+          `;
 
-        const smtpUser = process.env.SMTP_USER;
-        const smtpPass = process.env.SMTP_PASS;
+          const smtpUser = process.env.SMTP_USER;
+          const smtpPass = process.env.SMTP_PASS;
 
-        if (smtpUser && smtpPass) {
-          const nodemailer = require('nodemailer');
-          const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: { user: smtpUser, pass: smtpPass },
-          });
-          await transporter.sendMail({
-            from: `"${businessName}" <${smtpUser}>`,
-            to: appointment.customer_email,
-            subject: `Reminder: Upcoming Appointment - ${businessName}`,
-            html: emailHtml,
-          });
-          console.log(`[Email] ✓ Sent via Gmail SMTP.`);
-          anyChannelSucceeded = true;
-        } else if (resendApiKey && resendApiKey !== 're_dummy_key') {
-          await resend.emails.send({
-            from: `${businessName} <${fromEmail}>`,
-            to: appointment.customer_email,
-            subject: `Reminder: Upcoming Appointment - ${businessName}`,
-            html: emailHtml,
-          });
-          console.log(`[Email] ✓ Sent via Resend.`);
-          anyChannelSucceeded = true;
+          if (smtpUser && smtpPass) {
+            const nodemailer = require('nodemailer');
+            const transporter = nodemailer.createTransport({
+              service: 'gmail',
+              auth: { user: smtpUser, pass: smtpPass },
+            });
+            await transporter.sendMail({
+              from: `"${businessName}" <${smtpUser}>`,
+              to: appointment.customer_email,
+              subject: `Reminder: Upcoming Appointment - ${businessName}`,
+              html: emailHtml,
+            });
+            console.log(`[Email] ✓ Sent via Gmail SMTP.`);
+            anyChannelSucceeded = true;
+          } else if (resendApiKey && resendApiKey !== 're_dummy_key') {
+            await resend.emails.send({
+              from: `${businessName} <${fromEmail}>`,
+              to: appointment.customer_email,
+              subject: `Reminder: Upcoming Appointment - ${businessName}`,
+              html: emailHtml,
+            });
+            console.log(`[Email] ✓ Sent via Resend.`);
+            anyChannelSucceeded = true;
+          }
+        } catch (err) {
+          console.error(`[Email] ✗ Failed for appointment ${appointment.id}:`, err.message);
         }
-      } catch (err) {
-        console.error(`[Email] ✗ Failed for appointment ${appointment.id}:`, err.message);
+      } else {
+        console.log(`[Email] Skipped: Customer has no email address configured.`);
       }
 
-      // ── 2. SMS (optional — never blocks email or WhatsApp) ─────────────────
+      // ── 2. SMS (optional — never blocks email) ─────────────────
       try {
         const smsResult = await sendSms(appointment, dateFormatted, timeFormatted);
         if (smsResult) anyChannelSucceeded = true;
-      } catch (_) {}
-
-      // ── 3. WhatsApp (optional — never blocks email or SMS) ─────────────────
-      try {
-        const waResult = await sendWhatsApp(appointment, dateFormatted, timeFormatted);
-        if (waResult) anyChannelSucceeded = true;
       } catch (_) {}
 
       // ── Mark reminder sent if ANY channel succeeded ───────────────────────

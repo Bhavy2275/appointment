@@ -15,6 +15,7 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [alternativePhone, setAlternativePhone] = useState('');
   const [reason, setReason] = useState('');
   
   const [isPending, startTransition] = useTransition();
@@ -54,14 +55,20 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
   const validateForm = () => {
     if (!selectedSlotTime) return 'Please select an appointment time slot.';
     if (!name.trim()) return 'Name is required.';
-    if (!email.trim()) return 'Email is required.';
     
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) return 'Please enter a valid email address.';
+    if (email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) return 'Please enter a valid email address.';
+    }
     
     if (!phone.trim()) return 'Phone number is required.';
     const phoneRegex = /^[+]?[0-9\s\-()]{7,15}$/;
     if (!phoneRegex.test(phone)) return 'Please enter a valid phone number.';
+    
+    if (alternativePhone.trim()) {
+      const altPhoneRegex = /^[+]?[0-9\s\-()]{7,15}$/;
+      if (!altPhoneRegex.test(alternativePhone)) return 'Please enter a valid alternative phone number.';
+    }
     
     return null;
   };
@@ -79,8 +86,9 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
     startTransition(async () => {
       const result = await bookAppointment({
         name,
-        email,
+        email: email.trim() || undefined,
         phone,
+        alternativePhone: alternativePhone.trim() || undefined,
         reason,
         slotTime: selectedSlotTime,
       });
@@ -120,7 +128,13 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
           <CheckCircle className="w-12 h-12" />
         </div>
         <h2 className="text-3xl font-bold text-white tracking-tight mb-2">Booking Confirmed!</h2>
-        <p className="text-zinc-400 mb-6">We've reserved your slot and sent a confirmation email to <span className="text-white font-semibold">{email}</span></p>
+        <p className="text-zinc-400 mb-6 font-semibold">
+          {email ? (
+            <>We've reserved your slot and sent a confirmation email to <span className="text-white font-bold">{email}</span></>
+          ) : (
+            <>We've reserved your slot successfully!</>
+          )}
+        </p>
         
         <div className="bg-zinc-950/60 border border-zinc-850 rounded-2xl p-6 mb-8 text-left space-y-4">
           <div className="flex items-start gap-4">
@@ -160,6 +174,7 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
             setName('');
             setEmail('');
             setPhone('');
+            setAlternativePhone('');
             setReason('');
           }}
           className="w-full bg-white hover:bg-zinc-200 text-black font-semibold py-4 px-6 rounded-2xl transition-all shadow-md active:scale-[0.98] cursor-pointer"
@@ -243,10 +258,15 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
                   {slotsByDate[selectedDateStr].map((slot) => {
                     const slotIso = new Date(slot.slot_time).toISOString();
                     const isSelected = selectedSlotTime === slotIso;
-                    const slotTimeStr = new Date(slot.slot_time).toLocaleTimeString('en-US', {
+                    const slotStart = new Date(slot.slot_time);
+                    const slotEnd = new Date(slotStart.getTime() + 15 * 60000);
+                    const slotTimeStr = `${slotStart.toLocaleTimeString('en-US', {
                       hour: '2-digit',
                       minute: '2-digit',
-                    });
+                    })} - ${slotEnd.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}`;
 
                     return (
                       <button
@@ -329,7 +349,7 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
 
             <div>
               <label htmlFor="email" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-                Email Address
+                Email Address <span className="text-zinc-600">(Optional)</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-600">
@@ -338,7 +358,6 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
                 <input
                   id="email"
                   type="email"
-                  required
                   disabled={!selectedSlotTime || isPending}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -363,6 +382,26 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
                   disabled={!selectedSlotTime || isPending}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(555) 000-0000"
+                  className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl py-3 pl-11 pr-4 text-zinc-200 placeholder-zinc-700 outline-none text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="alternativePhone" className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
+                Alternative Phone Number <span className="text-zinc-600">(Optional)</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-zinc-600">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <input
+                  id="alternativePhone"
+                  type="tel"
+                  disabled={!selectedSlotTime || isPending}
+                  value={alternativePhone}
+                  onChange={(e) => setAlternativePhone(e.target.value)}
                   placeholder="(555) 000-0000"
                   className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl py-3 pl-11 pr-4 text-zinc-200 placeholder-zinc-700 outline-none text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 />
