@@ -538,11 +538,11 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                           <td className="py-4 px-6 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-                              <span className="text-zinc-200 font-medium">{formattedDate}</span>
+                              <span className="text-zinc-200 font-medium" suppressHydrationWarning>{formattedDate}</span>
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <Clock className="w-3.5 h-3.5 text-zinc-600" />
-                              <span className="text-zinc-500 text-xs">{formattedTime}</span>
+                              <span className="text-zinc-500 text-xs" suppressHydrationWarning>{formattedTime}</span>
                             </div>
                           </td>
                           {/* Reason */}
@@ -809,9 +809,9 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                       <div className="flex items-center gap-3">
                         <Clock className={`w-4 h-4 ${isBooked ? 'text-zinc-300' : 'text-zinc-600'}`} />
                         <div>
-                          <p className="font-semibold text-zinc-200">{formattedDateTime}</p>
+                          <p className="font-semibold text-zinc-200" suppressHydrationWarning>{formattedDateTime}</p>
                           {isBooked ? (
-                            <p className="text-xs text-zinc-300 font-semibold mt-0.5 flex items-center gap-1">
+                            <p className="text-xs text-zinc-300 font-semibold mt-0.5 flex items-center gap-1" suppressHydrationWarning>
                               Booked by {item.customer_name} 
                               <span className="text-zinc-500">&bull; {item.appointment_status}</span>
                             </p>
