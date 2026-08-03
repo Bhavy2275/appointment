@@ -339,4 +339,14 @@ async function run() {
   }
 }
 
-run();
+const isLoop = process.argv.includes('--watch') || process.argv.includes('--loop');
+
+if (isLoop) {
+  console.log('Starting Reminder Service in watch mode (polling database every 60 seconds)...');
+  run().catch(err => console.error('Error in cron run:', err.message));
+  setInterval(() => {
+    run().catch(err => console.error('Error in cron run:', err.message));
+  }, 60000);
+} else {
+  run().catch(err => console.error('Error in cron run:', err.message));
+}
