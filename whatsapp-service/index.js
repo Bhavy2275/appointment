@@ -136,6 +136,38 @@ app.get('/health', (_req, res) => {
 });
 
 /**
+ * GET /logout
+ * Clears old session credentials and forces fresh QR code generation.
+ */
+app.get('/logout', async (_req, res) => {
+  try {
+    isConnected = false;
+    latestQrDataUrl = null;
+    if (sock) {
+      try { sock.end(undefined); } catch (_) {}
+    }
+    if (fs.existsSync(AUTH_DIR)) {
+      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    }
+    console.log('[WhatsApp] Session reset requested. Initialising clean connection...');
+    setTimeout(() => {
+      connectToWhatsApp().catch((err) => console.error('Reset error:', err));
+    }, 1000);
+    return res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
+          <h2 style="color: #3b82f6;">Session Cleared!</h2>
+          <p>Redirecting to QR scanner in 3 seconds...</p>
+          <script>setTimeout(() => location.href = '/qr', 3000);</script>
+        </body>
+      </html>
+    `);
+  } catch (err: any) {
+    return res.status(500).send('Error resetting session: ' + err.message);
+  }
+});
+
+/**
  * GET /qr
  * Displays a clean webpage with an image QR code for scanning.
  */
