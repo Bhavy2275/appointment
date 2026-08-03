@@ -60,8 +60,8 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   
   // Bulk Slot Create State
   const [bulkDate, setBulkDate] = useState('');
-  const [bulkStart, setBulkStart] = useState('22:00'); // Default to 10 PM
-  const [bulkEnd, setBulkEnd] = useState('10:00');   // Default to 10 AM
+  const [bulkStart, setBulkStart] = useState('10:00 AM'); 
+  const [bulkEnd, setBulkEnd] = useState('10:00 PM');   
   const [bulkInterval, setBulkInterval] = useState('15'); // default to 15 minutes
 
   // Edit Appointment Modal State
@@ -172,43 +172,67 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       return;
     }
 
+    // Parse date (DD/MM/YYYY or DD-MM-YYYY)
+    const dateCleaned = bulkDate.trim();
+    const dateMatch = dateCleaned.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    let day: number, month: number, year: number;
+
+    if (dateMatch) {
+      day = parseInt(dateMatch[1], 10);
+      month = parseInt(dateMatch[2], 10) - 1; // 0-based
+      year = parseInt(dateMatch[3], 10);
+    } else {
+      // Fallback YYYY-MM-DD
+      const parts = dateCleaned.split('-');
+      if (parts.length === 3) {
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10) - 1;
+        day = parseInt(parts[2], 10);
+      } else {
+        showNotification('error', 'Invalid date format for bulk generation. Use DD/MM/YYYY (e.g. 08/05/2026).');
+        return;
+      }
+    }
+
+    const baseDate = new Date(year, month, day);
+    if (isNaN(baseDate.getTime())) {
+      showNotification('error', 'Invalid date value. Use DD/MM/YYYY format.');
+      return;
+    }
+
     const startMinutes = parseTimeToMinutes(bulkStart);
     const endMinutes = parseTimeToMinutes(bulkEnd);
-    const interval = parseInt(bulkInterval);
 
+    if (startMinutes === null || endMinutes === null) {
+      showNotification('error', 'Invalid start or end time format. Use HH:MM or 10:00 AM format.');
+      return;
+    }
+
+    const interval = parseInt(bulkInterval, 10);
     const slotTimes: string[] = [];
 
-    if (startMinutes < endMinutes) {
+    if (startMinutes <= endMinutes) {
       // Normal range within the same calendar day
       for (let m = startMinutes; m <= endMinutes; m += interval) {
-        const hours = Math.floor(m / 60).toString().padStart(2, '0');
-        const mins = (m % 60).toString().padStart(2, '0');
-        const localDate = new Date(`${bulkDate}T${hours}:${mins}:00`);
+        const hours = Math.floor(m / 60);
+        const mins = m % 60;
+        const localDate = new Date(year, month, day, hours, mins, 0);
         slotTimes.push(localDate.toISOString());
       }
     } else {
       // Range spans across midnight
-      // 1. From startMinutes up to the end of the first day
       for (let m = startMinutes; m < 1440; m += interval) {
-        const hours = Math.floor(m / 60).toString().padStart(2, '0');
-        const mins = (m % 60).toString().padStart(2, '0');
-        const localDate = new Date(`${bulkDate}T${hours}:${mins}:00`);
+        const hours = Math.floor(m / 60);
+        const mins = m % 60;
+        const localDate = new Date(year, month, day, hours, mins, 0);
         slotTimes.push(localDate.toISOString());
       }
       
-      // 2. Calculate the next day date local-safely
-      const parts = bulkDate.split('-');
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1; // 0-based
-      const day = parseInt(parts[2], 10);
-      
-      const nextDay = new Date(year, month, day + 1);
-      const nextYear = nextDay.getFullYear();
-      const nextMonth = String(nextDay.getMonth() + 1).padStart(2, '0');
-      const nextDate = String(nextDay.getDate()).padStart(2, '0');
-      const nextDayStr = `${nextYear}-${nextMonth}-${nextDate}`;
+      const nextDayObj = new Date(year, month, day + 1);
+      const nextYear = nextDayObj.getFullYear();
+      const nextMonth = nextDayObj.getMonth();
+      const nextDay = nextDayObj.getDate();
 
-      // Calculate the start offset for the next day, which continues the interval
       let lastSlotMin = startMinutes;
       while (lastSlotMin + interval < 1440) {
         lastSlotMin += interval;
@@ -216,9 +240,9 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       const nextDayStartMin = (lastSlotMin + interval) - 1440;
 
       for (let m = nextDayStartMin; m <= endMinutes; m += interval) {
-        const hours = Math.floor(m / 60).toString().padStart(2, '0');
-        const mins = (m % 60).toString().padStart(2, '0');
-        const localDate = new Date(`${nextDayStr}T${hours}:${mins}:00`);
+        const hours = Math.floor(m / 60);
+        const mins = m % 60;
+        const localDate = new Date(nextYear, nextMonth, nextDay, hours, mins, 0);
         slotTimes.push(localDate.toISOString());
       }
     }
@@ -226,17 +250,35 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
     startTransition(async () => {
       const result = await createTimeSlots(slotTimes);
       if (result.success) {
-        showNotification('success', `Bulk generated ${result.count} slots starting ${bulkDate}`);
+        const dateFormatted = baseDate.toLocaleDateString('en-IN', { dateStyle: 'medium' });
+        showNotification('success', `✓ Bulk generated ${result.count || 0} slot(s) starting ${dateFormatted}`);
         refreshData();
+      } else if (result.error === 'Unauthorized') {
+        showNotification('error', 'Session expired. Redirecting to login...');
+        setTimeout(() => router.push('/admin/login'), 2000);
       } else {
         showNotification('error', result.error || 'Failed to generate slots.');
       }
     });
   };
 
-  const parseTimeToMinutes = (timeStr: string) => {
-    const [h, m] = timeStr.split(':').map(Number);
-    return h * 60 + m;
+  const parseTimeToMinutes = (timeStr: string): number | null => {
+    if (!timeStr) return null;
+    const clean = timeStr.trim();
+    const match = clean.match(/^(\d{1,2})[:.](\d{2})(?:\s*(AM|PM))?$/i);
+    if (!match) return null;
+
+    let hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const ampm = match[3];
+
+    if (ampm) {
+      if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+      if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+    }
+
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+    return hours * 60 + minutes;
   };
 
   // Delete slot
@@ -660,32 +702,45 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Day Date</label>
                   <input
-                    type="date"
+                    type="text"
                     required
+                    placeholder="DD/MM/YYYY"
+                    maxLength={10}
                     value={bulkDate}
                     onChange={(e) => setBulkDate(e.target.value)}
-                    className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all"
+                    className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all placeholder:text-zinc-600"
                   />
+                  {bulkDate && bulkDate.match(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/) && (() => {
+                    const [d, m, y] = bulkDate.split(/[\/-]/).map(Number);
+                    const parsed = new Date(y, m - 1, d);
+                    return !isNaN(parsed.getTime()) ? (
+                      <p className="text-xs text-emerald-400 mt-1 font-medium">
+                        ✓ {parsed.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Start Time</label>
                     <input
-                      type="time"
+                      type="text"
                       required
+                      placeholder="10:00 AM"
                       value={bulkStart}
                       onChange={(e) => setBulkStart(e.target.value)}
-                      className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all"
+                      className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all placeholder:text-zinc-600"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">End Time</label>
                     <input
-                      type="time"
+                      type="text"
                       required
+                      placeholder="10:00 PM"
                       value={bulkEnd}
                       onChange={(e) => setBulkEnd(e.target.value)}
-                      className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all"
+                      className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all placeholder:text-zinc-600"
                     />
                   </div>
                 </div>
