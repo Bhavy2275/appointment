@@ -201,17 +201,24 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
     const appointmentId = result.rows[0].id;
 
     // 5. Send instant confirmation email (SMTP or Resend)
+    const businessTimezone = process.env.BUSINESS_TIMEZONE || 'Asia/Kolkata';
     const dateFormatted = slotDate.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
+      timeZone: businessTimezone
     });
-    const timeFormatted = slotDate.toLocaleTimeString('en-US', {
+    const timeFormatted = `${slotDate.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      timeZoneName: 'short',
-    });
+      timeZone: businessTimezone
+    })} - ${new Date(slotDate.getTime() + 15 * 60000).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: businessTimezone,
+      timeZoneName: 'short'
+    })}`;
 
     const emailHtml = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">

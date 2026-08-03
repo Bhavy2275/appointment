@@ -131,13 +131,16 @@ async function sendFiveMinuteWhatsAppReminders(client) {
     console.log(`Found ${result.rows.length} pending 5-minute WhatsApp reminders.`);
 
     for (const appointment of result.rows) {
+      const businessTimezone = process.env.BUSINESS_TIMEZONE || 'Asia/Kolkata';
       const slotDate = new Date(appointment.slot_time);
+      const slotEndDate = new Date(slotDate.getTime() + 15 * 60 * 1000);
       const dateFormatted = slotDate.toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        timeZone: businessTimezone
       });
-      const timeFormatted = slotDate.toLocaleTimeString('en-US', {
-        hour: '2-digit', minute: '2-digit',
-      });
+      const startTimeFormatted = slotDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: businessTimezone });
+      const endTimeFormatted = slotEndDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: businessTimezone, timeZoneName: 'short' });
+      const timeFormatted = `${startTimeFormatted} - ${endTimeFormatted}`;
 
       console.log(`\nSending 5-min WhatsApp reminder for appointment ${appointment.id} — ${appointment.customer_name}`);
 
@@ -223,14 +226,16 @@ async function run() {
     console.log(`\nFound ${result.rows.length} pending long-term email/SMS reminders.`);
 
     for (const appointment of result.rows) {
+      const businessTimezone = process.env.BUSINESS_TIMEZONE || 'Asia/Kolkata';
       const slotDate     = new Date(appointment.slot_time);
       const slotEndDate  = new Date(slotDate.getTime() + 15 * 60 * 1000);
       const dateFormatted = slotDate.toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        timeZone: businessTimezone
       });
       
-      const startTimeFormatted = slotDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      const endTimeFormatted = slotEndDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' });
+      const startTimeFormatted = slotDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: businessTimezone });
+      const endTimeFormatted = slotEndDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: businessTimezone, timeZoneName: 'short' });
       const timeFormatted = `${startTimeFormatted} - ${endTimeFormatted}`;
 
       console.log(
