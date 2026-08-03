@@ -30,6 +30,15 @@ interface AdminDashboardProps {
   initialSlots: AdminSlotRow[];
 }
 
+// Returns today's date in YYYY-MM-DD format using LOCAL timezone (not UTC)
+function getLocalTodayString(): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   const router = useRouter();
   const [data, setData] = useState<AdminSlotRow[]>(initialSlots);
@@ -46,11 +55,11 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Single Slot Create State
-  const [singleDate, setSingleDate] = useState('');
+  const [singleDate, setSingleDate] = useState(getLocalTodayString());
   const [singleTime, setSingleTime] = useState('');
   
   // Bulk Slot Create State
-  const [bulkDate, setBulkDate] = useState('');
+  const [bulkDate, setBulkDate] = useState(getLocalTodayString());
   const [bulkStart, setBulkStart] = useState('22:00'); // Default to 10 PM
   const [bulkEnd, setBulkEnd] = useState('10:00');   // Default to 10 AM
   const [bulkInterval, setBulkInterval] = useState('15'); // default to 15 minutes
@@ -132,16 +141,20 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
     }
 
     const dateTimeStr = localDate.toISOString();
+    console.log('[SlotCreate] Sending dateTimeStr:', dateTimeStr, '| Local:', localDate.toLocaleString());
     startTransition(async () => {
       const result = await createTimeSlots([dateTimeStr]);
-      if (result.success) {
-        showNotification('success', `Created slot for ${localDate.toLocaleString()}`);
+      console.log('[SlotCreate] Result:', result);
+      if (result.success && result.count && result.count > 0) {
+        showNotification('success', `✓ Slot created: ${localDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`);
         setSingleDate('');
         setSingleTime('');
         refreshData();
       } else if (result.error === 'Unauthorized') {
         showNotification('error', 'Session expired. Redirecting to login...');
         setTimeout(() => router.push('/admin/login'), 2000);
+      } else if (result.success && (!result.count || result.count === 0)) {
+        showNotification('error', `Slot already exists for ${localDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} — pick a different time.`);
       } else {
         showNotification('error', result.error || 'Failed to create slot.');
       }
@@ -599,10 +612,16 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                   <input
                     type="date"
                     required
+                    min={getLocalTodayString()}
                     value={singleDate}
                     onChange={(e) => setSingleDate(e.target.value)}
                     className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all"
                   />
+                  {singleDate && (
+                    <p className="text-xs text-emerald-400 mt-1 font-medium">
+                      ✓ {new Date(singleDate + 'T12:00:00').toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Time</label>
