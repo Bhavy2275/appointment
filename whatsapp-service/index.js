@@ -162,7 +162,7 @@ app.get('/logout', async (_req, res) => {
         </body>
       </html>
     `);
-  } catch (err: any) {
+  } catch (err) {
     return res.status(500).send('Error resetting session: ' + err.message);
   }
 });
