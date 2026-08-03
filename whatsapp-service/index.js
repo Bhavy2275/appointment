@@ -99,8 +99,14 @@ async function connectToWhatsApp() {
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
 
       if (statusCode === DisconnectReason.loggedOut) {
-        console.error('[WhatsApp] Logged out — deleting session...');
-        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+        console.error('[WhatsApp] Logged out — QR re-scan required. Clearing session contents...');
+        if (fs.existsSync(AUTH_DIR)) {
+          const files = fs.readdirSync(AUTH_DIR);
+          for (const file of files) {
+            fs.rmSync(path.join(AUTH_DIR, file), { recursive: true, force: true });
+          }
+        }
+        console.error('[WhatsApp] Session cleared. Reconnecting for new QR scan...');
         latestQrDataUrl = null;
         connectToWhatsApp();
         return;
