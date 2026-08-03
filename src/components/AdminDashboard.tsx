@@ -91,11 +91,12 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       return;
     }
 
-    const dateTimeStr = `${singleDate}T${singleTime}:00`;
+    const localDate = new Date(`${singleDate}T${singleTime}:00`);
+    const dateTimeStr = localDate.toISOString();
     startTransition(async () => {
       const result = await createTimeSlots([dateTimeStr]);
       if (result.success) {
-        showNotification('success', `Created slot for ${new Date(dateTimeStr).toLocaleString()}`);
+        showNotification('success', `Created slot for ${localDate.toLocaleString()}`);
         setSingleDate('');
         setSingleTime('');
         refreshData();
@@ -124,7 +125,8 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       for (let m = startMinutes; m <= endMinutes; m += interval) {
         const hours = Math.floor(m / 60).toString().padStart(2, '0');
         const mins = (m % 60).toString().padStart(2, '0');
-        slotTimes.push(`${bulkDate}T${hours}:${mins}:00`);
+        const localDate = new Date(`${bulkDate}T${hours}:${mins}:00`);
+        slotTimes.push(localDate.toISOString());
       }
     } else {
       // Range spans across midnight
@@ -132,13 +134,21 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       for (let m = startMinutes; m < 1440; m += interval) {
         const hours = Math.floor(m / 60).toString().padStart(2, '0');
         const mins = (m % 60).toString().padStart(2, '0');
-        slotTimes.push(`${bulkDate}T${hours}:${mins}:00`);
+        const localDate = new Date(`${bulkDate}T${hours}:${mins}:00`);
+        slotTimes.push(localDate.toISOString());
       }
       
-      // 2. Calculate the next day date
-      const currentDate = new Date(bulkDate + 'T00:00:00');
-      currentDate.setDate(currentDate.getDate() + 1);
-      const nextDayStr = currentDate.toISOString().split('T')[0];
+      // 2. Calculate the next day date local-safely
+      const parts = bulkDate.split('-');
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // 0-based
+      const day = parseInt(parts[2], 10);
+      
+      const nextDay = new Date(year, month, day + 1);
+      const nextYear = nextDay.getFullYear();
+      const nextMonth = String(nextDay.getMonth() + 1).padStart(2, '0');
+      const nextDate = String(nextDay.getDate()).padStart(2, '0');
+      const nextDayStr = `${nextYear}-${nextMonth}-${nextDate}`;
 
       // Calculate the start offset for the next day, which continues the interval
       let lastSlotMin = startMinutes;
@@ -150,7 +160,8 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       for (let m = nextDayStartMin; m <= endMinutes; m += interval) {
         const hours = Math.floor(m / 60).toString().padStart(2, '0');
         const mins = (m % 60).toString().padStart(2, '0');
-        slotTimes.push(`${nextDayStr}T${hours}:${mins}:00`);
+        const localDate = new Date(`${nextDayStr}T${hours}:${mins}:00`);
+        slotTimes.push(localDate.toISOString());
       }
     }
 
