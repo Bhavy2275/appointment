@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Calendar, Clock, User, Mail, Phone, MessageSquare, 
@@ -33,6 +33,11 @@ interface AdminDashboardProps {
 export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   const router = useRouter();
   const [data, setData] = useState<AdminSlotRow[]>(initialSlots);
+
+  // Sync data whenever server re-renders with new initialSlots (after router.refresh())
+  useEffect(() => {
+    setData(initialSlots);
+  }, [initialSlots]);
   const [activeTab, setActiveTab] = useState<'appointments' | 'slots'>('appointments');
   const [isPending, startTransition] = useTransition();
 
@@ -299,9 +304,9 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
     });
   };
 
-  const refreshData = () => {
+  const refreshData = useCallback(() => {
     router.refresh();
-  };
+  }, [router]);
 
   // --- FILTERS & COMPUTED ---
 
