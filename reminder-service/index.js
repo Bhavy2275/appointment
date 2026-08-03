@@ -70,8 +70,14 @@ async function sendWhatsApp(appointment, phone, dateFormatted, timeFormatted) {
     return false;
   }
 
-  const message =
-    `Hi ${appointment.customer_name}, this is a reminder that your session is in 5 minutes! Your appointment with ${businessName} is scheduled on ${dateFormatted} at ${timeFormatted}. See you soon!`;
+  const message = `Hi ${appointment.customer_name},
+
+ *Your VR experience is ready.* 
+
+ It begins in 5 minutes.
+ Please make your way to Stall: H11- 0208.
+
+DAM Lighting Solutions Team looks forward to take you to the  World of Lighting.`;
 
   try {
     const response = await axios.post(

@@ -324,7 +324,17 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
     if (isWaEnabled) {
       const rawUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
       const waUrl = rawUrl.trim().replace(/^["']|["']$/g, '');
-      const waMsg = `Hi ${input.name}, your appointment with ${businessName} has been confirmed for ${dateFormatted} at ${timeFormatted}. Location: ${businessLocation}. We look forward to seeing you!`;
+      const waMsg = `Hi ${input.name},
+
+Welcome to the *DAM Lighting Solutions* VR World.
+
+ *Your immersive VR experience awaits.* 
+
+ _Step inside. Explore. Experience lighting like never before._
+
+day ${dateFormatted}
+time ${timeFormatted}
+📍Stall H11- 0208`;
       const sendSingleWa = async (targetPhone: string) => {
         try {
           const rawPhone = (targetPhone || '').replace(/\D/g, '');
