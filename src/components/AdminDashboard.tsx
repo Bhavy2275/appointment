@@ -55,11 +55,11 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Single Slot Create State
-  const [singleDate, setSingleDate] = useState(getLocalTodayString());
+  const [singleDate, setSingleDate] = useState('');
   const [singleTime, setSingleTime] = useState('');
   
   // Bulk Slot Create State
-  const [bulkDate, setBulkDate] = useState(getLocalTodayString());
+  const [bulkDate, setBulkDate] = useState('');
   const [bulkStart, setBulkStart] = useState('22:00'); // Default to 10 PM
   const [bulkEnd, setBulkEnd] = useState('10:00');   // Default to 10 AM
   const [bulkInterval, setBulkInterval] = useState('15'); // default to 15 minutes
@@ -107,33 +107,36 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       return;
     }
 
-    // Robust parsing of date and time strings
+    // Robust parsing of date (DD/MM/YYYY) and time strings
     let localDate: Date;
     const timeClean = singleTime.trim();
-    
+    const dateCleaned = singleDate.trim();
+
+    // Parse date: accept DD/MM/YYYY or DD-MM-YYYY
+    const dateMatch = dateCleaned.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+    if (!dateMatch) {
+      showNotification('error', 'Invalid date. Use DD/MM/YYYY format (e.g. 15/08/2026).');
+      return;
+    }
+    const day = parseInt(dateMatch[1], 10);
+    const month = parseInt(dateMatch[2], 10) - 1; // 0-based
+    const year = parseInt(dateMatch[3], 10);
+
     // Matches "14:15", "2:15 PM", "14.15", "2.15 PM", etc.
     const timeMatch = timeClean.match(/^(\d{1,2})[:.](\d{2})(?:\s*(AM|PM))?$/i);
-    
-    if (timeMatch) {
-      let hours = parseInt(timeMatch[1], 10);
-      const minutes = parseInt(timeMatch[2], 10);
-      const ampm = timeMatch[3];
-      
-      if (ampm) {
-        if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
-        if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
-      }
-      
-      const parts = singleDate.split('-');
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1; // 0-based
-      const day = parseInt(parts[2], 10);
-      
-      localDate = new Date(year, month, day, hours, minutes, 0);
-    } else {
-      // Fallback to standard parsing
-      localDate = new Date(`${singleDate}T${singleTime}:00`);
+    if (!timeMatch) {
+      showNotification('error', 'Invalid time. Use HH:MM format (e.g. 14:30 or 2:30 PM).');
+      return;
     }
+    let hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    const ampm = timeMatch[3];
+    if (ampm) {
+      if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+      if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+    }
+
+    localDate = new Date(year, month, day, hours, minutes, 0);
 
     if (isNaN(localDate.getTime())) {
       showNotification('error', 'Invalid date or time value. Use HH:MM format.');
@@ -610,18 +613,23 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Date</label>
                   <input
-                    type="date"
+                    type="text"
                     required
-                    min={getLocalTodayString()}
+                    placeholder="DD/MM/YYYY"
                     value={singleDate}
                     onChange={(e) => setSingleDate(e.target.value)}
-                    className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all"
+                    maxLength={10}
+                    className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all placeholder:text-zinc-600"
                   />
-                  {singleDate && (
-                    <p className="text-xs text-emerald-400 mt-1 font-medium">
-                      ✓ {new Date(singleDate + 'T12:00:00').toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                    </p>
-                  )}
+                  {singleDate && singleDate.match(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/) && (() => {
+                    const [d, m, y] = singleDate.split(/[\/-]/).map(Number);
+                    const parsed = new Date(y, m - 1, d);
+                    return !isNaN(parsed.getTime()) ? (
+                      <p className="text-xs text-emerald-400 mt-1 font-medium">
+                        ✓ {parsed.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    ) : null;
+                  })()}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Time</label>
