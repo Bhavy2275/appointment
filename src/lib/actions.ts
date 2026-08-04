@@ -10,8 +10,10 @@ import { query } from './db';
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key');
 
 // Business Metadata
-const businessName = process.env.NEXT_PUBLIC_BUSINESS_NAME || 'Aura Wellness';
-const businessLocation = process.env.NEXT_PUBLIC_BUSINESS_LOCATION || '123 Wellness Way, Cityville';
+const _envName = process.env.NEXT_PUBLIC_BUSINESS_NAME;
+const businessName = (_envName && _envName !== 'ABC' && _envName !== 'Aura Wellness') ? _envName : 'DAM Lighting Solutions';
+const _envLoc = process.env.NEXT_PUBLIC_BUSINESS_LOCATION;
+const businessLocation = (_envLoc && !_envLoc.includes('ABC') && !_envLoc.includes('Cityville')) ? _envLoc : 'Stall: H11- 0208';
 const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
 // --- AUTHENTICATION ACTIONS ---
