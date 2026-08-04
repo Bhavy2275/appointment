@@ -7,7 +7,8 @@ const axios = require('axios');
 const connectionString        = process.env.DATABASE_URL;
 const resendApiKey            = process.env.RESEND_API_KEY;
 const reminderHours           = parseInt(process.env.REMINDER_HOURS_BEFORE || '48', 10);
-const businessName            = process.env.NEXT_PUBLIC_BUSINESS_NAME || 'Aura Wellness';
+const _envName                = process.env.NEXT_PUBLIC_BUSINESS_NAME;
+const businessName            = (_envName && _envName !== 'ABC' && _envName !== 'Aura Wellness') ? _envName : 'DAM Lighting Solutions';
 const fromEmail               = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
 // SMS (Fast2SMS)
