@@ -332,7 +332,7 @@ Welcome to the *DAM Lighting Solutions* VR World.
 
  _Step inside. Explore. Experience lighting like never before._
 
-day ${dateFormatted}
+${dateFormatted}
 time ${timeFormatted}
 📍Stall H11- 0208`;
       const sendSingleWa = async (targetPhone: string) => {
