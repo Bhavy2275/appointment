@@ -31,7 +31,8 @@ export default function AdminLogin() {
     });
   };
 
-  const businessName = process.env.NEXT_PUBLIC_BUSINESS_NAME || 'DAM Lighting Solutions';
+  const _envName = process.env.NEXT_PUBLIC_BUSINESS_NAME;
+  const businessName = (_envName && _envName !== 'ABC' && _envName !== 'Aura Wellness') ? _envName : 'DAM Lighting Solutions';
 
   return (
     <div className="relative min-h-screen bg-[#101566] text-white flex flex-col justify-center items-center px-4 overflow-hidden font-sans">

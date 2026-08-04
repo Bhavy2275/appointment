@@ -15,7 +15,7 @@ export default async function Home() {
   const availableSlots = await getAvailableTimeSlots();
 
   const envName = process.env.NEXT_PUBLIC_BUSINESS_NAME;
-  const businessName = (envName && envName !== 'ABC' && envName !== 'Aura Wellness') ? envName : 'DAM';
+  const businessName = (envName && envName !== 'ABC' && envName !== 'Aura Wellness') ? envName : 'DAM Lighting Solutions';
 
   const envLoc = process.env.NEXT_PUBLIC_BUSINESS_LOCATION;
   const businessLocation = (envLoc && !envLoc.includes('ABC') && !envLoc.includes('Cityville')) ? envLoc : 'Stall: H11- 0208';
