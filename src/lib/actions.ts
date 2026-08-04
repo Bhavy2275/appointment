@@ -345,11 +345,8 @@ time ${timeFormatted}
       notificationPromises.push(sendWaTask());
     }
 
-    // Run notifications with 4s maximum total wait timeout so UI is never blocked
-    Promise.race([
-      Promise.allSettled(notificationPromises),
-      new Promise((resolve) => setTimeout(resolve, 4000)),
-    ]).catch(() => {});
+    // Await all parallel notifications so Vercel keeps lambda alive until email and WhatsApp complete
+    await Promise.allSettled(notificationPromises);
 
     revalidatePath('/');
     revalidatePath('/admin');

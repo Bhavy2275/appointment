@@ -128,8 +128,8 @@ async function sendFiveMinuteWhatsAppReminders(client) {
       FROM appointments
       WHERE status = 'booked'
         AND whatsapp_reminder_sent = FALSE
-        AND slot_time > NOW()
-        AND slot_time <= NOW() + INTERVAL '6 minutes'
+        AND slot_time >= NOW() - INTERVAL '15 minutes'
+        AND slot_time <= NOW() + INTERVAL '30 minutes'
       ORDER BY slot_time ASC
     `;
     const result = await client.query(queryText);
