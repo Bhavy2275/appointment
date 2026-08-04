@@ -62,6 +62,17 @@ async function run() {
     `);
     console.log('✓ Added whatsapp_reminder_sent column (if not exists).');
 
+    // 4. Create qr_scans table for storing per-user QR scan history
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS qr_scans (
+        id             UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+        qr_content     TEXT NOT NULL,
+        scanned_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+    console.log('✓ Created qr_scans table (if not exists).');
+
     console.log('Migration completed successfully.');
   } catch (err) {
     console.error('Migration failed:', err);

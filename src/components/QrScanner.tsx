@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ScanLine, X, AlertCircle, Loader2, Copy, ExternalLink, Check, QrCode } from 'lucide-react';
-import { checkInAppointment } from '@/lib/actions';
+import { checkInAppointment, saveQrScan } from '@/lib/actions';
 
 interface AppointmentInfo {
   id: string;
@@ -12,7 +12,7 @@ interface AppointmentInfo {
   checkedIn: boolean;
 }
 
-export default function QrScanner() {
+export default function QrScanner({ appointmentId }: { appointmentId?: string }) {
   const scannerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isStarted, setIsStarted] = useState(false);
@@ -42,6 +42,11 @@ export default function QrScanner() {
     setScannedText(rawText);
     setAppointmentInfo(null);
     setError('');
+
+    // Silently save scan to user's account if appointmentId is provided
+    if (appointmentId) {
+      saveQrScan(appointmentId, rawText).catch(() => {});
+    }
 
     // Check if decoded text contains a booking verify ID
     const match = rawText.match(/\/verify\/([a-f0-9-]+)/i);

@@ -169,7 +169,7 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
             <p className="text-white font-extrabold text-sm uppercase tracking-widest">QR Code Scanner</p>
           </div>
           <p className="text-white/60 text-xs mb-3">Scan any QR code using camera or upload a QR image</p>
-          <QrScanner />
+          <QrScanner appointmentId={successData.id} />
         </div>
 
         {/* Book Another */}

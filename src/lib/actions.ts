@@ -473,3 +473,79 @@ export async function adminBookAppointment(
     return { success: false, error: err.message || 'Failed to book appointment' };
   }
 }
+
+// --- QR SCAN ACTIONS ---
+
+// Save a QR scan linked to a user's appointment (their "account")
+export async function saveQrScan(
+  appointmentId: string,
+  qrContent: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!appointmentId || !qrContent) {
+    return { success: false, error: 'Missing appointmentId or qrContent' };
+  }
+  try {
+    await query(
+      `INSERT INTO qr_scans (appointment_id, qr_content) VALUES ($1, $2)`,
+      [appointmentId, qrContent]
+    );
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// Admin: Export all users + their QR scans as structured data
+export async function exportUsersWithScans(): Promise<{
+  success: boolean;
+  data?: {
+    name: string;
+    email: string;
+    phone: string;
+    alternativePhone: string;
+    slotTime: string;
+    status: string;
+    scans: string[];
+  }[];
+  error?: string;
+}> {
+  const auth = await checkAdminAuth();
+  if (!auth) return { success: false, error: 'Unauthorized' };
+
+  try {
+    const result = await query(
+      `SELECT
+         a.id,
+         a.customer_name      AS name,
+         a.customer_email     AS email,
+         a.customer_phone     AS phone,
+         a.customer_alternative_phone AS alternative_phone,
+         a.slot_time,
+         a.status,
+         COALESCE(
+           json_agg(qs.qr_content ORDER BY qs.scanned_at ASC)
+             FILTER (WHERE qs.qr_content IS NOT NULL),
+           '[]'
+         ) AS scans
+       FROM appointments a
+       LEFT JOIN qr_scans qs ON qs.appointment_id = a.id
+       GROUP BY a.id
+       ORDER BY a.slot_time DESC`,
+      []
+    );
+
+    const data = result.rows.map((row: any) => ({
+      name: row.name || '',
+      email: row.email || '',
+      phone: row.phone || '',
+      alternativePhone: row.alternative_phone || '',
+      slotTime: row.slot_time,
+      status: row.status,
+      scans: Array.isArray(row.scans) ? row.scans : [],
+    }));
+
+    return { success: true, data };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}

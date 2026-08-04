@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation';
 import { 
   Calendar, Clock, User, Mail, Phone, MessageSquare, 
   Trash2, Check, X, Edit, Plus, ListFilter, 
-  Search, ShieldAlert, CheckCircle, LogOut, ScanLine
+  Search, ShieldAlert, CheckCircle, LogOut, ScanLine, Download
 } from 'lucide-react';
 import { 
   createTimeSlots, deleteTimeSlot, 
   updateAppointmentStatus, updateAppointmentDetails, 
-  adminBookAppointment, logoutAdmin 
+  adminBookAppointment, logoutAdmin, exportUsersWithScans
 } from '@/lib/actions';
 
 interface AdminSlotRow {
@@ -86,6 +86,48 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   } | null>(null);
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [excelDownloading, setExcelDownloading] = useState(false);
+
+  const handleDownloadExcel = async () => {
+    setExcelDownloading(true);
+    try {
+      const result = await exportUsersWithScans();
+      if (!result.success || !result.data) {
+        showNotification('error', result.error || 'Failed to export data.');
+        return;
+      }
+
+      const XLSX = await import('xlsx');
+
+      // Find max number of scans across all users
+      const maxScans = result.data.reduce((max, row) => Math.max(max, row.scans.length), 0);
+
+      // Build header row
+      const scanHeaders = Array.from({ length: maxScans }, (_, i) => `QR Scan ${i + 1}`);
+      const headers = ['Name', 'Email', 'Phone', 'Alt. Phone', 'Slot Time', 'Status', ...scanHeaders];
+
+      // Build data rows
+      const rows = result.data.map((row) => {
+        const slotFormatted = new Date(row.slotTime).toLocaleString('en-IN', {
+          dateStyle: 'medium', timeStyle: 'short',
+        });
+        const scanCols = Array.from({ length: maxScans }, (_, i) => row.scans[i] || '');
+        return [row.name, row.email, row.phone, row.alternativePhone, slotFormatted, row.status, ...scanCols];
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Users & QR Scans');
+
+      const today = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `DAM-users-qr-scans-${today}.xlsx`);
+      showNotification('success', 'Excel file downloaded!');
+    } catch (err: any) {
+      showNotification('error', 'Failed to generate Excel: ' + (err?.message || ''));
+    } finally {
+      setExcelDownloading(false);
+    }
+  };
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -433,6 +475,15 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
             }`}
           >
             Time Slots
+          </button>
+          <button
+            onClick={handleDownloadExcel}
+            disabled={excelDownloading}
+            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md"
+            title="Download Excel"
+          >
+            <Download className="w-4 h-4" />
+            {excelDownloading ? 'Exporting…' : 'Excel'}
           </button>
           <button
             onClick={handleLogout}
