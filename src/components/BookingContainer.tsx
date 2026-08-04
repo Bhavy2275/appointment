@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Calendar, Clock, User, Mail, Phone, MessageSquare, CheckCircle, MapPin, Building, ArrowRight, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, MessageSquare, CheckCircle, MapPin, ArrowRight, AlertCircle } from 'lucide-react';
 import { bookAppointment, TimeSlot } from '@/lib/actions';
+import QrTicket from '@/components/QrTicket';
 
 interface BookingContainerProps {
   initialSlots: TimeSlot[];
@@ -122,51 +123,60 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
 
   // Render Success Screen
   if (successData) {
+    const appHost = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const verifyUrl = `${appHost.replace(/\/$/, '')}/verify/${successData.id}`;
+
     return (
-      <div className="w-full max-w-xl mx-auto bg-zinc-900/40 border border-zinc-800 rounded-3xl p-8 shadow-2xl text-center animate-fade-in">
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-zinc-800 text-white rounded-full mb-6">
-          <CheckCircle className="w-12 h-12" />
+      <div className="w-full max-w-xl mx-auto text-center animate-fade-in font-sans">
+        {/* Header */}
+        <div className="flex flex-col items-center mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#EEF2F6] rounded-full mb-4 shadow-lg">
+            <CheckCircle className="w-9 h-9 text-[#101566]" />
+          </div>
+          <h2 className="text-3xl font-extrabold text-white tracking-tight mb-2">Booking Confirmed!</h2>
+          <p className="text-white/60 text-sm font-semibold">
+            {email ? (
+              <>Confirmation sent to <span className="text-white font-bold">{email}</span></>
+            ) : (
+              <>Your VR session has been reserved!</>
+            )}
+          </p>
         </div>
-        <h2 className="text-3xl font-bold text-white tracking-tight mb-2">Booking Confirmed!</h2>
-        <p className="text-zinc-400 mb-6 font-semibold">
-          {email ? (
-            <>We've reserved your slot and sent a confirmation email to <span className="text-white font-bold">{email}</span></>
-          ) : (
-            <>We've reserved your slot successfully!</>
-          )}
-        </p>
-        
-        <div className="bg-zinc-950/60 border border-zinc-850 rounded-2xl p-6 mb-8 text-left space-y-4">
+
+        {/* Session Info Card */}
+        <div className="bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 mb-6 text-left space-y-4 backdrop-blur-md shadow-2xl">
           <div className="flex items-start gap-4">
-            <Building className="w-5 h-5 text-zinc-400 mt-1" />
+            <MapPin className="w-5 h-5 text-white/50 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Business</p>
-              <p className="text-base text-zinc-200 font-semibold">{businessName}</p>
+              <p className="text-xs text-white/50 font-semibold uppercase tracking-wider">Location</p>
+              <p className="text-base text-white font-bold">Stall H11- 0208</p>
             </div>
           </div>
           <div className="flex items-start gap-4">
-            <MapPin className="w-5 h-5 text-zinc-400 mt-1" />
+            <Calendar className="w-5 h-5 text-white/50 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Location</p>
-              <p className="text-base text-zinc-200">{businessLocation}</p>
+              <p className="text-xs text-white/50 font-semibold uppercase tracking-wider">Date</p>
+              <p className="text-base text-white font-semibold">{successData.dateFormatted}</p>
             </div>
           </div>
           <div className="flex items-start gap-4">
-            <Calendar className="w-5 h-5 text-zinc-400 mt-1" />
+            <Clock className="w-5 h-5 text-white/50 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Date</p>
-              <p className="text-base text-zinc-200">{successData.dateFormatted}</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-4">
-            <Clock className="w-5 h-5 text-zinc-400 mt-1" />
-            <div>
-              <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Time</p>
-              <p className="text-base text-zinc-200">{successData.timeFormatted}</p>
+              <p className="text-xs text-white/50 font-semibold uppercase tracking-wider">Time Slot</p>
+              <p className="text-base text-white font-semibold">{successData.timeFormatted}</p>
             </div>
           </div>
         </div>
 
+        {/* QR Ticket Pass */}
+        <div className="bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 mb-6 backdrop-blur-md shadow-2xl">
+          <p className="text-white font-extrabold text-sm uppercase tracking-widest mb-4">🎟️ Your VR Ticket Pass</p>
+          <div className="flex justify-center">
+            <QrTicket appointmentId={successData.id} verifyUrl={verifyUrl} />
+          </div>
+        </div>
+
+        {/* Book Another */}
         <button
           onClick={() => {
             setSuccessData(null);
@@ -177,9 +187,9 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
             setAlternativePhone('');
             setReason('');
           }}
-          className="w-full bg-white hover:bg-zinc-200 text-black font-semibold py-4 px-6 rounded-2xl transition-all shadow-md active:scale-[0.98] cursor-pointer"
+          className="w-full bg-[#EEF2F6] hover:bg-white text-[#101566] font-extrabold uppercase tracking-widest py-4 px-6 rounded-2xl transition-all shadow-md active:scale-[0.98] cursor-pointer text-sm"
         >
-          Book Another Appointment
+          Book Another Session
         </button>
       </div>
     );

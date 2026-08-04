@@ -200,6 +200,19 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
 
     const appointmentId = result.rows[0].id;
 
+    // Build verification URL for the QR code ticket
+    const appHost = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const verifyUrl = `${appHost.replace(/\/$/, '')}/verify/${appointmentId}`;
+
+    // Generate QR Code Data URL
+    let qrDataUrl = '';
+    try {
+      const QRCode = require('qrcode');
+      qrDataUrl = await QRCode.toDataURL(verifyUrl, { width: 300, margin: 2 });
+    } catch (qrErr) {
+      console.error('[QR] Error generating QR data URL:', qrErr);
+    }
+
     // 5. Send instant confirmation email (SMTP or Resend)
     const businessTimezone = process.env.BUSINESS_TIMEZONE || 'Asia/Kolkata';
     const dateFormatted = slotDate.toLocaleDateString('en-US', {
@@ -224,18 +237,28 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background-color: #101566; color: #ffffff; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
         <div style="text-align: center; margin-bottom: 20px;">
           <h2 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800;">DAM Lighting Solutions</h2>
-          <p style="color: #EEF2F6; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; font-weight: 600;">VR World Session Booking</p>
+          <p style="color: #EEF2F6; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; font-weight: 600;">VR World Session Ticket</p>
         </div>
         <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.15); margin: 20px 0;" />
         <p style="font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 12px;">Hi ${input.name},</p>
         <p style="font-size: 15px; color: #EEF2F6; margin-bottom: 12px;">Welcome to the <strong>DAM Lighting Solutions</strong> VR World.</p>
         <p style="font-size: 15px; color: #ffffff; font-weight: 700; margin-bottom: 8px;"><em>Your immersive VR experience awaits.</em></p>
         <p style="font-size: 14px; color: #D1D5DB; font-style: italic; margin-bottom: 20px;">Step inside. Explore. Experience lighting like never before.</p>
+        
         <div style="background-color: #0B0E42; padding: 18px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); margin-bottom: 20px;">
           <p style="font-size: 15px; color: #ffffff; margin: 0 0 6px 0; font-weight: 600;">${dateFormatted}</p>
           <p style="font-size: 14px; color: #EEF2F6; margin: 0 0 6px 0;">time ${timeFormatted}</p>
           <p style="font-size: 14px; color: #ffffff; margin: 0; font-weight: 600;">📍Stall H11- 0208</p>
         </div>
+
+        ${qrDataUrl ? `
+        <div style="text-align: center; background-color: #ffffff; padding: 16px; border-radius: 12px; margin-bottom: 20px; display: inline-block; width: 100%; box-sizing: border-box;">
+          <img src="${qrDataUrl}" alt="VR Ticket Pass QR Code" style="width: 180px; height: 180px; display: block; margin: 0 auto;" />
+          <p style="color: #101566; font-size: 12px; font-weight: 700; margin-top: 8px;">Show this QR Code at Stall H11- 0208 for entry</p>
+          <a href="${verifyUrl}" style="color: #101566; font-size: 12px; text-decoration: underline; font-weight: 600;">View Ticket Pass Online &rarr;</a>
+        </div>
+        ` : ''}
+
         <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.15); margin: 20px 0;" />
         <p style="font-size: 13px; color: #D1D5DB; margin: 0;">
           We look forward to seeing you at the DAM Lighting Solutions VR World!
@@ -261,7 +284,7 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
           await transporter.sendMail({
             from: `"${businessName}" <${smtpUser}>`,
             to: input.email,
-            subject: `Appointment Confirmed - ${businessName}`,
+            subject: `VR Experience Pass - DAM Lighting Solutions`,
             html: emailHtml,
           });
           console.log(`[Instant Confirmation] Email sent via Gmail SMTP.`);
@@ -273,7 +296,7 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
           await resend.emails.send({
             from: `${businessName} <${fromEmail}>`,
             to: input.email,
-            subject: `Appointment Confirmed - ${businessName}`,
+            subject: `VR Experience Pass - DAM Lighting Solutions`,
             html: emailHtml,
           });
           console.log(`[Instant Confirmation] Email sent via Resend.`);
@@ -286,7 +309,7 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
     // 6. Send INSTANT SMS confirmation (Fast2SMS)
     const isSmsEnabled = String(process.env.SMS_ENABLED || '').toLowerCase().trim() === 'true';
     if (isSmsEnabled && process.env.FAST2SMS_API_KEY) {
-      const smsMsg = encodeURIComponent(`Confirmed: Your appointment with ${businessName} is set for ${dateFormatted} at ${timeFormatted}. Thank you!`);
+      const smsMsg = encodeURIComponent(`Confirmed: Your DAM Lighting VR session is set for ${dateFormatted} at ${timeFormatted}. Pass: ${verifyUrl}`);
       const sendSingleSms = async (targetPhone: string) => {
         try {
           const phone10 = (targetPhone || '').replace(/\D/g, '').slice(-10);
@@ -320,7 +343,9 @@ Welcome to the *DAM Lighting Solutions* VR World.
 
 ${dateFormatted}
 time ${timeFormatted}
-📍Stall H11- 0208`;
+📍Stall H11- 0208
+
+🎟️ *Your Ticket Pass:* ${verifyUrl}`;
       const sendSingleWa = async (targetPhone: string) => {
         try {
           const rawPhone = (targetPhone || '').replace(/\D/g, '');
@@ -349,11 +374,43 @@ time ${timeFormatted}
     return { success: true, appointmentId };
   } catch (err: any) {
     console.error('Error booking appointment:', err);
-    // Standardize Postgres unique key violation code: 23505
     if (err.code === '23505') {
       return { success: false, error: 'This slot has already been booked. Please select a different time slot.' };
     }
     return { success: false, error: err.message || 'An unexpected error occurred during booking.' };
+  }
+}
+
+// Fetch appointment details by ID for ticket verification
+export async function getAppointmentById(id: string) {
+  try {
+    const result = await query(
+      `SELECT id, customer_name, customer_email, customer_phone, customer_alternative_phone, service_reason, slot_time, status, created_at
+       FROM appointments
+       WHERE id = $1`,
+      [id]
+    );
+    if (result.rows.length === 0) return null;
+    return result.rows[0];
+  } catch (err: any) {
+    console.error('Error fetching appointment by id:', err);
+    return null;
+  }
+}
+
+// Mark appointment status as completed/checked-in (Admin or Stall Scanner)
+export async function checkInAppointment(id: string) {
+  try {
+    await query(
+      `UPDATE appointments SET status = 'completed' WHERE id = $1`,
+      [id]
+    );
+    revalidatePath('/');
+    revalidatePath('/admin');
+    revalidatePath(`/verify/${id}`);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Failed to check in appointment' };
   }
 }
 
