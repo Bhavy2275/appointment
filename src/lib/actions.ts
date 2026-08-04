@@ -247,74 +247,61 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
       </div>
     `;
 
+    // 5. Send instant confirmation notifications in parallel (non-blocking)
+    const notificationPromises: Promise<any>[] = [];
+
+    // --- EMAIL ---
     if (input.email) {
-      const smtpUser = process.env.SMTP_USER;
-      const smtpPass = process.env.SMTP_PASS;
+      const userEmail = input.email;
+      const sendEmailTask = async () => {
+        const smtpUser = process.env.SMTP_USER;
+        const smtpPass = process.env.SMTP_PASS;
 
-      if (smtpUser && smtpPass) {
-        try {
-          const nodemailer = require('nodemailer');
-          const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-              user: smtpUser,
-              pass: smtpPass,
-            },
-          });
+        if (smtpUser && smtpPass) {
+          try {
+            const nodemailer = require('nodemailer');
+            const transporter = nodemailer.createTransport({
+              service: 'gmail',
+              auth: { user: smtpUser, pass: smtpPass },
+              connectionTimeout: 4000,
+              greetingTimeout: 4000,
+              socketTimeout: 4000,
+            });
 
-          await transporter.sendMail({
-            from: `"${businessName}" <${smtpUser}>`,
-            to: input.email,
-            subject: `VR Experience Pass - DAM Lighting Solutions`,
-            html: emailHtml,
-          });
-          console.log(`[Instant Confirmation] Email sent via Gmail SMTP.`);
-        } catch (err) {
-          console.error('[Instant Confirmation] Failed to send email via SMTP:', err);
-        }
-      } else if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_dummy_key') {
-        try {
-          await resend.emails.send({
-            from: `${businessName} <${fromEmail}>`,
-            to: input.email,
-            subject: `VR Experience Pass - DAM Lighting Solutions`,
-            html: emailHtml,
-          });
-          console.log(`[Instant Confirmation] Email sent via Resend.`);
-        } catch (err) {
-          console.error('[Instant Confirmation] Failed to send email via Resend:', err);
-        }
-      }
-    }
-
-    // 6. Send INSTANT SMS confirmation (Fast2SMS)
-    const isSmsEnabled = String(process.env.SMS_ENABLED || '').toLowerCase().trim() === 'true';
-    if (isSmsEnabled && process.env.FAST2SMS_API_KEY) {
-      const smsMsg = encodeURIComponent(`Confirmed: Your DAM Lighting VR session is set for ${dateFormatted} at ${timeFormatted}. Stall H11- 0208.`);
-      const sendSingleSms = async (targetPhone: string) => {
-        try {
-          const phone10 = (targetPhone || '').replace(/\D/g, '').slice(-10);
-          if (phone10.length === 10) {
-            const smsUrl = `https://www.fast2sms.com/dev/bulkV2?authorization=${process.env.FAST2SMS_API_KEY}&variables_values=${smsMsg}&route=q&numbers=${phone10}`;
-            const res = await fetch(smsUrl);
-            console.log(`[Instant Confirmation] SMS sent to ${phone10}. Status: ${res.status}`);
+            await transporter.sendMail({
+              from: `"${businessName}" <${smtpUser}>`,
+              to: userEmail,
+              subject: `VR Experience Pass - DAM Lighting Solutions`,
+              html: emailHtml,
+            });
+            console.log(`[Instant Confirmation] Email sent via Gmail SMTP.`);
+          } catch (err) {
+            console.error('[Instant Confirmation] Failed to send email via SMTP:', err);
           }
-        } catch (err: any) {
-          console.error('[Instant Confirmation] SMS send error:', err.message);
+        } else if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY !== 're_dummy_key') {
+          try {
+            await resend.emails.send({
+              from: `${businessName} <${fromEmail}>`,
+              to: userEmail,
+              subject: `VR Experience Pass - DAM Lighting Solutions`,
+              html: emailHtml,
+            });
+            console.log(`[Instant Confirmation] Email sent via Resend.`);
+          } catch (err) {
+            console.error('[Instant Confirmation] Failed to send email via Resend:', err);
+          }
         }
       };
-      await sendSingleSms(input.phone);
-      if (input.alternativePhone) {
-        await sendSingleSms(input.alternativePhone);
-      }
+      notificationPromises.push(sendEmailTask());
     }
 
-    // 7. Send INSTANT WhatsApp confirmation (via whatsapp-service)
+    // --- WHATSAPP ---
     const isWaEnabled = String(process.env.WHATSAPP_ENABLED || '').toLowerCase().trim() === 'true';
     if (isWaEnabled) {
-      const rawUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
-      const waUrl = rawUrl.trim().replace(/^["']|["']$/g, '');
-      const waMsg = `Hi ${input.name},
+      const sendWaTask = async () => {
+        const rawUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
+        const waUrl = rawUrl.trim().replace(/^["']|["']$/g, '');
+        const waMsg = `Hi ${input.name},
 
 Welcome to the *DAM Lighting Solutions* VR World.
 
@@ -325,27 +312,38 @@ Welcome to the *DAM Lighting Solutions* VR World.
 ${dateFormatted}
 time ${timeFormatted}
 📍Stall H11- 0208`;
-      const sendSingleWa = async (targetPhone: string) => {
-        try {
-          const rawPhone = (targetPhone || '').replace(/\D/g, '');
-          if (rawPhone) {
-            const res = await fetch(`${waUrl}/send`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: rawPhone, message: waMsg }),
-            });
-            const text = await res.text();
-            console.log(`[Instant Confirmation] WhatsApp request sent to ${rawPhone}. Status: ${res.status}, Response: ${text}`);
+
+        const sendSingleWa = async (targetPhone: string) => {
+          try {
+            const rawPhone = (targetPhone || '').replace(/\D/g, '');
+            if (rawPhone) {
+              const res = await fetch(`${waUrl}/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: rawPhone, message: waMsg }),
+                signal: AbortSignal.timeout(4000),
+              });
+              const text = await res.text();
+              console.log(`[Instant Confirmation] WhatsApp request sent to ${rawPhone}. Status: ${res.status}, Response: ${text}`);
+            }
+          } catch (err: any) {
+            console.error('[Instant Confirmation] WhatsApp send error:', err.message);
           }
-        } catch (err: any) {
-          console.error('[Instant Confirmation] WhatsApp send error:', err.message);
+        };
+
+        await sendSingleWa(input.phone);
+        if (input.alternativePhone) {
+          await sendSingleWa(input.alternativePhone);
         }
       };
-      await sendSingleWa(input.phone);
-      if (input.alternativePhone) {
-        await sendSingleWa(input.alternativePhone);
-      }
+      notificationPromises.push(sendWaTask());
     }
+
+    // Run notifications with 4s maximum total wait timeout so UI is never blocked
+    Promise.race([
+      Promise.allSettled(notificationPromises),
+      new Promise((resolve) => setTimeout(resolve, 4000)),
+    ]).catch(() => {});
 
     revalidatePath('/');
     revalidatePath('/admin');
