@@ -200,19 +200,6 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
 
     const appointmentId = result.rows[0].id;
 
-    // Build verification URL for the QR code ticket
-    const appHost = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const verifyUrl = `${appHost.replace(/\/$/, '')}/verify/${appointmentId}`;
-
-    // Generate QR Code Data URL
-    let qrDataUrl = '';
-    try {
-      const QRCode = require('qrcode');
-      qrDataUrl = await QRCode.toDataURL(verifyUrl, { width: 300, margin: 2 });
-    } catch (qrErr) {
-      console.error('[QR] Error generating QR data URL:', qrErr);
-    }
-
     // 5. Send instant confirmation email (SMTP or Resend)
     const businessTimezone = process.env.BUSINESS_TIMEZONE || 'Asia/Kolkata';
     const dateFormatted = slotDate.toLocaleDateString('en-US', {
@@ -250,14 +237,6 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
           <p style="font-size: 14px; color: #EEF2F6; margin: 0 0 6px 0;">time ${timeFormatted}</p>
           <p style="font-size: 14px; color: #ffffff; margin: 0; font-weight: 600;">📍Stall H11- 0208</p>
         </div>
-
-        ${qrDataUrl ? `
-        <div style="text-align: center; background-color: #ffffff; padding: 16px; border-radius: 12px; margin-bottom: 20px; display: inline-block; width: 100%; box-sizing: border-box;">
-          <img src="${qrDataUrl}" alt="VR Ticket Pass QR Code" style="width: 180px; height: 180px; display: block; margin: 0 auto;" />
-          <p style="color: #101566; font-size: 12px; font-weight: 700; margin-top: 8px;">Show this QR Code at Stall H11- 0208 for entry</p>
-          <a href="${verifyUrl}" style="color: #101566; font-size: 12px; text-decoration: underline; font-weight: 600;">View Ticket Pass Online &rarr;</a>
-        </div>
-        ` : ''}
 
         <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.15); margin: 20px 0;" />
         <p style="font-size: 13px; color: #D1D5DB; margin: 0;">
@@ -309,7 +288,7 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
     // 6. Send INSTANT SMS confirmation (Fast2SMS)
     const isSmsEnabled = String(process.env.SMS_ENABLED || '').toLowerCase().trim() === 'true';
     if (isSmsEnabled && process.env.FAST2SMS_API_KEY) {
-      const smsMsg = encodeURIComponent(`Confirmed: Your DAM Lighting VR session is set for ${dateFormatted} at ${timeFormatted}. Pass: ${verifyUrl}`);
+      const smsMsg = encodeURIComponent(`Confirmed: Your DAM Lighting VR session is set for ${dateFormatted} at ${timeFormatted}. Stall H11- 0208.`);
       const sendSingleSms = async (targetPhone: string) => {
         try {
           const phone10 = (targetPhone || '').replace(/\D/g, '').slice(-10);
@@ -343,9 +322,7 @@ Welcome to the *DAM Lighting Solutions* VR World.
 
 ${dateFormatted}
 time ${timeFormatted}
-📍Stall H11- 0208
-
-🎟️ *Your Ticket Pass:* ${verifyUrl}`;
+📍Stall H11- 0208`;
       const sendSingleWa = async (targetPhone: string) => {
         try {
           const rawPhone = (targetPhone || '').replace(/\D/g, '');

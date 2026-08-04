@@ -12,7 +12,6 @@ import {
   updateAppointmentStatus, updateAppointmentDetails, 
   adminBookAppointment, logoutAdmin 
 } from '@/lib/actions';
-import QrScanner from '@/components/QrScanner';
 
 interface AdminSlotRow {
   slot_id: string;
@@ -48,7 +47,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   useEffect(() => {
     setData(initialSlots);
   }, [initialSlots]);
-  const [activeTab, setActiveTab] = useState<'appointments' | 'slots' | 'scanner'>('appointments');
+  const [activeTab, setActiveTab] = useState<'appointments' | 'slots'>('appointments');
   const [isPending, startTransition] = useTransition();
 
   // Search & Filter state
@@ -434,16 +433,6 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
             }`}
           >
             Time Slots
-          </button>
-          <button
-            onClick={() => setActiveTab('scanner')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
-              activeTab === 'scanner'
-                ? 'bg-[#EEF2F6] text-[#101566] shadow-md'
-                : 'bg-[#080A30]/60 hover:bg-white/10 text-white/80'
-            }`}
-          >
-            <ScanLine className="w-3.5 h-3.5" /> Check-In
           </button>
           <button
             onClick={handleLogout}
@@ -1050,46 +1039,6 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* --- SCANNER TAB --- */}
-      {activeTab === 'scanner' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
-          {/* Scanner Panel */}
-          <div className="lg:col-span-6 bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
-            <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-              <ScanLine className="w-5 h-5 text-white/70" /> Stall Check-In Scanner
-            </h2>
-            <p className="text-white/50 text-xs uppercase tracking-wider font-semibold mb-5">Scan guest QR ticket at H11-0208</p>
-            <QrScanner />
-          </div>
-
-          {/* Instructions Panel */}
-          <div className="lg:col-span-6 space-y-4">
-            <div className="bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
-              <h3 className="text-sm font-extrabold text-white uppercase tracking-widest mb-4">How to Check In Guests</h3>
-              <ol className="space-y-4 text-sm">
-                {[
-                  { step: '1', text: 'Ask the guest to open their VR Ticket Pass on their phone (from email, WhatsApp, or the confirmation screen).' },
-                  { step: '2', text: 'Tap "Start Scanner" above and allow camera access.' },
-                  { step: '3', text: 'Point the camera at the guest\'s QR code on their phone screen.' },
-                  { step: '4', text: 'Review the guest details and tap "Mark as Checked In" to confirm their entry.' },
-                  { step: '5', text: 'Tap "Scan Next" to check in the next guest.' },
-                ].map(({ step, text }) => (
-                  <li key={step} className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#EEF2F6] text-[#101566] text-xs font-extrabold flex items-center justify-center">{step}</span>
-                    <span className="text-white/70 leading-relaxed">{text}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <div className="bg-[#080A30]/80 border border-white/10 rounded-2xl p-4">
-              <p className="text-white/40 text-xs uppercase tracking-widest font-semibold mb-2">Tip</p>
-              <p className="text-white/60 text-sm">Guests can also open their ticket by visiting the link sent in their WhatsApp or Email confirmation message.</p>
-            </div>
           </div>
         </div>
       )}

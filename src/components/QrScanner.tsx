@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle, ScanLine, X, AlertCircle, Loader2 } from 'lucide-react';
+import { ScanLine, X, AlertCircle, Loader2, Copy, ExternalLink, Check, QrCode } from 'lucide-react';
 import { checkInAppointment } from '@/lib/actions';
 
-interface ScanResult {
+interface AppointmentInfo {
   id: string;
   name: string;
   status: string;
@@ -16,7 +16,12 @@ export default function QrScanner() {
   const scannerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isStarted, setIsStarted] = useState(false);
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  
+  // Scanned raw result (for any QR code)
+  const [scannedText, setScannedText] = useState<string | null>(null);
+  const [appointmentInfo, setAppointmentInfo] = useState<AppointmentInfo | null>(null);
+  
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
@@ -32,9 +37,36 @@ export default function QrScanner() {
     setIsStarted(false);
   };
 
+  const processDecodedText = async (rawText: string) => {
+    await stopScanner();
+    setScannedText(rawText);
+    setAppointmentInfo(null);
+    setError('');
+
+    // Check if decoded text contains a booking verify ID
+    const match = rawText.match(/\/verify\/([a-f0-9-]+)/i);
+    if (match) {
+      const bookingId = match[1];
+      try {
+        const res = await fetch(`/api/verify/${bookingId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setAppointmentInfo({
+            id: bookingId,
+            name: data.customer_name,
+            status: data.status,
+            slotTime: data.slot_time,
+            checkedIn: false,
+          });
+        }
+      } catch (_) {}
+    }
+  };
+
   const startScanner = async () => {
     setError('');
-    setScanResult(null);
+    setScannedText(null);
+    setAppointmentInfo(null);
     setLoading(true);
     setIsStarted(true);
 
@@ -53,26 +85,7 @@ export default function QrScanner() {
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         async (decodedText: string) => {
-          await stopScanner();
-          // Extract booking ID from the verify URL or use raw text as ID
-          let bookingId = decodedText;
-          const match = decodedText.match(/\/verify\/([a-f0-9-]+)/i);
-          if (match) bookingId = match[1];
-
-          try {
-            const res = await fetch(`/api/verify/${bookingId}`);
-            if (!res.ok) throw new Error('Ticket not found');
-            const data = await res.json();
-            setScanResult({
-              id: bookingId,
-              name: data.customer_name,
-              status: data.status,
-              slotTime: data.slot_time,
-              checkedIn: false,
-            });
-          } catch {
-            setError('Could not verify this ticket. Please try again.');
-          }
+          await processDecodedText(decodedText);
         },
         undefined
       );
@@ -91,29 +104,12 @@ export default function QrScanner() {
     }
   };
 
-  const handleCheckIn = async () => {
-    if (!scanResult) return;
-    setCheckingIn(true);
-    const result = await checkInAppointment(scanResult.id);
-    if (result.success) {
-      setScanResult(prev => prev ? { ...prev, status: 'completed', checkedIn: true } : null);
-    } else {
-      setError(result.error || 'Check-in failed.');
-    }
-    setCheckingIn(false);
-  };
-
-  useEffect(() => {
-    return () => { stopScanner(); };
-  }, []);
-
-  const tz = 'Asia/Kolkata';
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setError('');
-    setScanResult(null);
+    setScannedText(null);
+    setAppointmentInfo(null);
     setLoading(true);
 
     try {
@@ -127,32 +123,43 @@ export default function QrScanner() {
       }
       const html5QrCode = new Html5Qrcode('qr-file-container');
       const decodedText = await html5QrCode.scanFile(file, false);
-      
-      let bookingId = decodedText;
-      const match = decodedText.match(/\/verify\/([a-f0-9-]+)/i);
-      if (match) bookingId = match[1];
-
-      const res = await fetch(`/api/verify/${bookingId}`);
-      if (!res.ok) throw new Error('Ticket not found');
-      const data = await res.json();
-      setScanResult({
-        id: bookingId,
-        name: data.customer_name,
-        status: data.status,
-        slotTime: data.slot_time,
-        checkedIn: false,
-      });
+      await processDecodedText(decodedText);
       html5QrCode.clear();
     } catch (err: any) {
-      setError('Could not read QR code from image. Please ensure image is clear or try live camera scanner.');
+      setError('Could not read QR code from image. Please ensure image is clear or try live camera.');
     } finally {
       setLoading(false);
       e.target.value = '';
     }
   };
 
+  const handleCopy = () => {
+    if (!scannedText) return;
+    navigator.clipboard.writeText(scannedText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleCheckIn = async () => {
+    if (!appointmentInfo) return;
+    setCheckingIn(true);
+    const result = await checkInAppointment(appointmentInfo.id);
+    if (result.success) {
+      setAppointmentInfo(prev => prev ? { ...prev, status: 'completed', checkedIn: true } : null);
+    } else {
+      setError(result.error || 'Check-in failed.');
+    }
+    setCheckingIn(false);
+  };
+
+  useEffect(() => {
+    return () => { stopScanner(); };
+  }, []);
+
+  const isUrl = scannedText ? /^https?:\/\//i.test(scannedText.trim()) : false;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Scanner Viewport */}
       {isStarted ? (
         <div className="relative">
@@ -175,11 +182,11 @@ export default function QrScanner() {
       ) : (
         <div className="flex flex-col items-center justify-center gap-5 py-10 px-4 bg-[#080A30]/60 border border-white/10 rounded-2xl">
           <div className="p-5 bg-[#0B0E42] rounded-2xl border border-white/15">
-            <ScanLine className="w-10 h-10 text-[#EEF2F6]" />
+            <QrCode className="w-10 h-10 text-[#EEF2F6]" />
           </div>
-          <div className="text-center">
-            <p className="text-white font-bold text-base">Stall Check-In Scanner</p>
-            <p className="text-white/50 text-xs mt-1">Point camera or upload a photo of guest's QR ticket</p>
+          <div className="text-center max-w-sm">
+            <p className="text-white font-bold text-base">QR Code Scanner</p>
+            <p className="text-white/50 text-xs mt-1">Scan any QR code using your phone camera or upload a QR image</p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-xs">
             <button
@@ -205,7 +212,7 @@ export default function QrScanner() {
         </div>
       )}
 
-      {/* Error */}
+      {/* Error Display */}
       {error && (
         <div className="flex items-start gap-3 bg-[#080A30] border border-white/20 rounded-xl p-4 text-sm text-white">
           <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
@@ -213,56 +220,76 @@ export default function QrScanner() {
         </div>
       )}
 
-      {/* Scan Result */}
-      {scanResult && (
-        <div className="bg-[#0B0E42]/80 border border-white/15 rounded-2xl p-5 space-y-4 backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${scanResult.checkedIn || scanResult.status === 'completed' ? 'bg-green-900/60' : 'bg-[#080A30]'} border border-white/15`}>
-              <CheckCircle className={`w-5 h-5 ${scanResult.checkedIn || scanResult.status === 'completed' ? 'text-green-400' : 'text-white/60'}`} />
-            </div>
-            <div>
-              <p className="text-white font-bold text-base">{scanResult.name}</p>
-              <p className="text-white/50 text-xs font-mono">{scanResult.id.slice(0, 16)}…</p>
-            </div>
-            <span className={`ml-auto text-xs font-extrabold uppercase tracking-wider px-3 py-1.5 rounded-full ${
-              scanResult.status === 'completed' ? 'bg-green-900/60 text-green-300 border border-green-500/30' :
-              scanResult.status === 'booked' ? 'bg-blue-900/60 text-blue-300 border border-blue-500/30' :
-              'bg-white/10 text-white/60 border border-white/15'
-            }`}>
-              {scanResult.status === 'completed' ? '✓ Checked In' : scanResult.status}
+      {/* Scanned QR Result Display */}
+      {scannedText && (
+        <div className="bg-[#0B0E42]/90 border border-white/20 rounded-2xl p-6 space-y-4 backdrop-blur-md shadow-2xl animate-fade-in">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-extrabold text-white/60 uppercase tracking-widest flex items-center gap-2">
+              <QrCode className="w-4 h-4 text-emerald-400" /> Scanned QR Code Result
             </span>
-          </div>
-
-          <div className="bg-[#080A30]/80 rounded-xl p-3 border border-white/10">
-            <p className="text-white/50 text-xs uppercase tracking-wider font-semibold mb-1">Session Slot</p>
-            <p className="text-white text-sm font-semibold">
-              {new Date(scanResult.slotTime).toLocaleString('en-US', {
-                weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: tz,
-              })}
-            </p>
-          </div>
-
-          <div className="flex gap-3">
-            {scanResult.status !== 'completed' && !scanResult.checkedIn ? (
-              <button
-                onClick={handleCheckIn}
-                disabled={checkingIn}
-                className="flex-1 flex items-center justify-center gap-2 bg-[#EEF2F6] hover:bg-white text-[#101566] font-extrabold text-xs uppercase tracking-wider py-3 rounded-xl transition-all active:scale-95 cursor-pointer disabled:opacity-60"
-              >
-                {checkingIn ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                {checkingIn ? 'Checking In…' : 'Mark as Checked In'}
-              </button>
-            ) : (
-              <div className="flex-1 flex items-center justify-center gap-2 bg-green-900/40 border border-green-500/30 text-green-300 font-extrabold text-xs uppercase tracking-wider py-3 rounded-xl">
-                <CheckCircle className="w-4 h-4" />
-                Guest Checked In Successfully
-              </div>
-            )}
             <button
-              onClick={() => { setScanResult(null); setError(''); }}
-              className="px-4 py-3 bg-[#080A30]/80 border border-white/15 text-white/70 hover:text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+              onClick={() => { setScannedText(null); setAppointmentInfo(null); setError(''); }}
+              className="text-xs text-white/50 hover:text-white underline cursor-pointer"
             >
-              Scan Next
+              Clear Result
+            </button>
+          </div>
+
+          <div className="bg-[#080A30] rounded-xl p-4 border border-white/15 break-all font-mono text-sm text-white select-all">
+            {scannedText}
+          </div>
+
+          {/* Appointment Check-in Card (if scanned code is a valid ticket) */}
+          {appointmentInfo && (
+            <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white font-bold text-sm">{appointmentInfo.name}</p>
+                  <p className="text-white/60 text-xs font-mono">ID: {appointmentInfo.id.slice(0, 12)}…</p>
+                </div>
+                <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-900/60 text-emerald-300 border border-emerald-500/30">
+                  {appointmentInfo.status}
+                </span>
+              </div>
+              {appointmentInfo.status !== 'completed' && !appointmentInfo.checkedIn && (
+                <button
+                  onClick={handleCheckIn}
+                  disabled={checkingIn}
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs uppercase tracking-wider py-2.5 rounded-lg transition-all active:scale-95 cursor-pointer"
+                >
+                  {checkingIn ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  {checkingIn ? 'Checking In…' : 'Mark as Checked In'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3 pt-2">
+            {isUrl && (
+              <a
+                href={scannedText}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#EEF2F6] hover:bg-white text-[#101566] font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md"
+              >
+                <ExternalLink className="w-4 h-4" /> Open Link
+              </a>
+            )}
+
+            <button
+              onClick={handleCopy}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+              {copied ? 'Copied!' : 'Copy Text'}
+            </button>
+
+            <button
+              onClick={startScanner}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#080A30] border border-white/20 text-white/80 hover:text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+            >
+              <ScanLine className="w-4 h-4" /> Scan Another
             </button>
           </div>
         </div>
