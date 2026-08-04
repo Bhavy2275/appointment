@@ -398,45 +398,45 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   });
 
   return (
-    <div className="space-y-8 animate-fade-in relative text-zinc-100">
+    <div className="space-y-8 animate-fade-in relative text-white font-sans">
       {/* Toast Notification */}
       {notification && (
-        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border bg-zinc-900 border-zinc-800 text-white transition-all`}>
-          {notification.type === 'success' ? <CheckCircle className="w-5 h-5 text-zinc-300" /> : <ShieldAlert className="w-5 h-5 text-zinc-400" />}
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl border bg-[#080A30] border-white/20 text-white transition-all`}>
+          {notification.type === 'success' ? <CheckCircle className="w-5 h-5 text-white" /> : <ShieldAlert className="w-5 h-5 text-white/70" />}
           <span className="text-sm font-semibold">{notification.message}</span>
         </div>
       )}
 
       {/* Dashboard Top Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-zinc-900/40 border border-zinc-800 rounded-3xl p-6 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Admin Control Center</h1>
-          <p className="text-zinc-500 text-sm mt-0.5">Manage schedules, slot lists, and bookings</p>
+          <h1 className="text-2xl font-extrabold text-white tracking-tight">Admin Control Center</h1>
+          <p className="text-white/60 text-xs mt-0.5 uppercase tracking-widest font-semibold">Manage schedules, slot lists, and bookings</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActiveTab('appointments')}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+            className={`px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
               activeTab === 'appointments'
-                ? 'bg-white text-black shadow-md'
-                : 'bg-zinc-950/60 hover:bg-zinc-950/90 text-zinc-400 hover:text-white'
+                ? 'bg-[#EEF2F6] text-[#101566] shadow-md'
+                : 'bg-[#080A30]/60 hover:bg-white/10 text-white/80'
             }`}
           >
             Bookings
           </button>
           <button
             onClick={() => setActiveTab('slots')}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+            className={`px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer ${
               activeTab === 'slots'
-                ? 'bg-white text-black shadow-md'
-                : 'bg-zinc-950/60 hover:bg-zinc-950/90 text-zinc-400 hover:text-white'
+                ? 'bg-[#EEF2F6] text-[#101566] shadow-md'
+                : 'bg-[#080A30]/60 hover:bg-white/10 text-white/80'
             }`}
           >
             Time Slots
           </button>
           <button
             onClick={handleLogout}
-            className="p-2 bg-zinc-950/60 border border-zinc-800 hover:border-white hover:text-white text-zinc-400 rounded-xl transition-all cursor-pointer"
+            className="p-2.5 bg-[#080A30]/60 border border-white/15 hover:border-white text-white/70 hover:text-white rounded-xl transition-all cursor-pointer"
             title="Log Out"
           >
             <LogOut className="w-4 h-4" />
@@ -448,10 +448,10 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       {activeTab === 'appointments' && (
         <div className="space-y-6">
           {/* Filters Bar */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-zinc-900/40 border border-zinc-800 rounded-3xl p-6 shadow-xl">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
             {/* Search */}
             <div className="md:col-span-6 relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-white/50">
                 <Search className="w-4 h-4" />
               </div>
               <input
@@ -459,13 +459,13 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search by name, email, or phone..."
-                className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl py-2.5 pl-10 pr-4 text-zinc-200 placeholder-zinc-700 outline-none text-sm transition-all"
+                className="w-full bg-[#080A30]/90 border border-white/20 focus:border-white rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-white/30 outline-none text-sm transition-all"
               />
             </div>
 
             {/* Filter status */}
             <div className="md:col-span-6 flex items-center gap-3 justify-end">
-              <span className="text-zinc-500 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-white/60 text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 flex-shrink-0">
                 <ListFilter className="w-3.5 h-3.5" /> Status:
               </span>
               <div className="flex gap-2 overflow-x-auto">
@@ -475,8 +475,8 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                     onClick={() => setStatusFilter(status)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
                       statusFilter === status
-                        ? 'bg-zinc-800 text-white'
-                        : 'bg-zinc-950/45 border border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                        ? 'bg-[#EEF2F6] text-[#101566] font-extrabold'
+                        : 'bg-[#080A30]/60 border border-white/15 text-white/70 hover:text-white'
                     }`}
                   >
                     {status === 'all' ? 'All' : status.replace('-', ' ')}
@@ -647,13 +647,13 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
           {/* Creator panel (left) */}
           <div className="lg:col-span-5 space-y-6">
             {/* Single Slot Creator */}
-            <div className="bg-zinc-900/40 border border-zinc-800 rounded-3xl p-6 shadow-xl">
+            <div className="bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
               <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Plus className="w-5 h-5 text-zinc-400" /> Create Single Slot
+                <Plus className="w-5 h-5 text-white/70" /> Create Single Slot
               </h2>
               <form onSubmit={handleCreateSingleSlot} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Date</label>
+                  <label className="block text-xs font-semibold text-white/70 uppercase tracking-wider mb-2">Date</label>
                   <input
                     type="text"
                     required
@@ -661,32 +661,32 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                     value={singleDate}
                     onChange={(e) => setSingleDate(e.target.value)}
                     maxLength={10}
-                    className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all placeholder:text-zinc-600"
+                    className="w-full bg-[#080A30]/90 border border-white/20 focus:border-white rounded-xl p-3 text-white outline-none text-sm transition-all placeholder-white/30"
                   />
                   {singleDate && singleDate.match(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/) && (() => {
                     const [d, m, y] = singleDate.split(/[\/-]/).map(Number);
                     const parsed = new Date(y, m - 1, d);
                     return !isNaN(parsed.getTime()) ? (
-                      <p className="text-xs text-emerald-400 mt-1 font-medium">
+                      <p className="text-xs text-white mt-1 font-medium">
                         ✓ {parsed.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                       </p>
                     ) : null;
                   })()}
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Time</label>
+                  <label className="block text-xs font-semibold text-white/70 uppercase tracking-wider mb-2">Time</label>
                   <input
                     type="time"
                     required
                     value={singleTime}
                     onChange={(e) => setSingleTime(e.target.value)}
-                    className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all"
+                    className="w-full bg-[#080A30]/90 border border-white/20 focus:border-white rounded-xl p-3 text-white outline-none text-sm transition-all"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-full bg-white hover:bg-zinc-200 text-black font-semibold py-3 px-4 rounded-xl text-sm transition-all active:scale-[0.98] cursor-pointer"
+                  className="w-full bg-[#EEF2F6] hover:bg-white text-[#101566] font-extrabold uppercase tracking-wider py-3 px-4 rounded-xl text-xs transition-all active:scale-[0.98] cursor-pointer"
                 >
                   Create Time Slot
                 </button>
@@ -694,13 +694,13 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
             </div>
 
             {/* Bulk Slot Generator */}
-            <div className="bg-zinc-900/40 border border-zinc-800 rounded-3xl p-6 shadow-xl">
+            <div className="bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
               <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-zinc-400" /> Bulk Slot Generator
+                <Calendar className="w-5 h-5 text-white/70" /> Bulk Slot Generator
               </h2>
               <form onSubmit={handleBulkGenerate} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Day Date</label>
+                  <label className="block text-xs font-semibold text-white/70 uppercase tracking-wider mb-2">Day Date</label>
                   <input
                     type="text"
                     required
@@ -708,13 +708,13 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                     maxLength={10}
                     value={bulkDate}
                     onChange={(e) => setBulkDate(e.target.value)}
-                    className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all placeholder:text-zinc-600"
+                    className="w-full bg-[#080A30]/90 border border-white/20 focus:border-white rounded-xl p-3 text-white outline-none text-sm transition-all placeholder-white/30"
                   />
                   {bulkDate && bulkDate.match(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}$/) && (() => {
                     const [d, m, y] = bulkDate.split(/[\/-]/).map(Number);
                     const parsed = new Date(y, m - 1, d);
                     return !isNaN(parsed.getTime()) ? (
-                      <p className="text-xs text-emerald-400 mt-1 font-medium">
+                      <p className="text-xs text-white mt-1 font-medium">
                         ✓ {parsed.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                       </p>
                     ) : null;
@@ -722,46 +722,46 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Start Time</label>
+                    <label className="block text-xs font-semibold text-white/70 uppercase tracking-wider mb-2">Start Time</label>
                     <input
                       type="text"
                       required
                       placeholder="10:00 AM"
                       value={bulkStart}
                       onChange={(e) => setBulkStart(e.target.value)}
-                      className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all placeholder:text-zinc-600"
+                      className="w-full bg-[#080A30]/90 border border-white/20 focus:border-white rounded-xl p-3 text-white outline-none text-sm transition-all placeholder-white/30"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">End Time</label>
+                    <label className="block text-xs font-semibold text-white/70 uppercase tracking-wider mb-2">End Time</label>
                     <input
                       type="text"
                       required
                       placeholder="10:00 PM"
                       value={bulkEnd}
                       onChange={(e) => setBulkEnd(e.target.value)}
-                      className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all placeholder:text-zinc-600"
+                      className="w-full bg-[#080A30]/90 border border-white/20 focus:border-white rounded-xl p-3 text-white outline-none text-sm transition-all placeholder-white/30"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Interval</label>
+                  <label className="block text-xs font-semibold text-white/70 uppercase tracking-wider mb-2">Interval</label>
                   <select
                     value={bulkInterval}
                     onChange={(e) => setBulkInterval(e.target.value)}
-                    className="w-full bg-zinc-950/60 border border-zinc-800 focus:border-white rounded-xl p-3 text-zinc-200 outline-none text-sm transition-all"
+                    className="w-full bg-[#080A30]/90 border border-white/20 focus:border-white rounded-xl p-3 text-white outline-none text-sm transition-all"
                   >
-                    <option value="15">Every 15 minutes</option>
-                    <option value="30">Every 30 minutes</option>
-                    <option value="45">Every 45 minutes</option>
-                    <option value="60">Every 60 minutes (1 Hour)</option>
-                    <option value="120">Every 120 minutes (2 Hours)</option>
+                    <option value="15" className="bg-[#080A30] text-white">Every 15 minutes</option>
+                    <option value="30" className="bg-[#080A30] text-white">Every 30 minutes</option>
+                    <option value="45" className="bg-[#080A30] text-white">Every 45 minutes</option>
+                    <option value="60" className="bg-[#080A30] text-white">Every 60 minutes (1 Hour)</option>
+                    <option value="120" className="bg-[#080A30] text-white">Every 120 minutes (2 Hours)</option>
                   </select>
                 </div>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-full bg-white hover:bg-zinc-200 text-black font-semibold py-3 px-4 rounded-xl text-sm transition-all active:scale-[0.98] cursor-pointer"
+                  className="w-full bg-[#EEF2F6] hover:bg-white text-[#101566] font-extrabold uppercase tracking-wider py-3 px-4 rounded-xl text-xs transition-all active:scale-[0.98] cursor-pointer"
                 >
                   Bulk Generate Slots
                 </button>
@@ -770,10 +770,10 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
           </div>
 
           {/* Slots List (Right) */}
-          <div className="lg:col-span-7 bg-zinc-900/40 border border-zinc-800 rounded-3xl overflow-hidden shadow-xl">
-            <div className="py-4 px-6 bg-zinc-950/40 border-b border-zinc-800 flex items-center justify-between">
+          <div className="lg:col-span-7 bg-[#0B0E42]/80 border border-white/15 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-md">
+            <div className="py-4 px-6 bg-[#080A30]/90 border-b border-white/15 flex items-center justify-between">
               <h2 className="text-base font-bold text-white">Configured Time Slots</h2>
-              <span className="text-xs text-zinc-500 font-semibold">{data.length} total slots</span>
+              <span className="text-xs text-white/60 font-semibold">{data.length} total slots</span>
             </div>
             {data.length === 0 ? (
               <div className="text-center py-16 px-4">

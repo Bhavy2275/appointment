@@ -7,20 +7,20 @@ const {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
 } = require('@whiskeysockets/baileys');
-const express   = require('express');
-const qrcode    = require('qrcode');
-const path      = require('path');
-const fs        = require('fs');
-const { Boom }  = require('@hapi/boom');
+const express = require('express');
+const qrcode = require('qrcode');
+const path = require('path');
+const fs = require('fs');
+const { Boom } = require('@hapi/boom');
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const PORT              = parseInt(process.env.PORT || process.env.WHATSAPP_PORT || '3001', 10);
-const WHATSAPP_ENABLED  = process.env.WHATSAPP_ENABLED === 'true';
-const DAILY_LIMIT       = parseInt(process.env.WHATSAPP_DAILY_SEND_LIMIT || '200', 10);
-const AUTH_DIR          = path.join(__dirname, 'auth_info_baileys');
-const MIN_DELAY_MS      = 1500;
-const MAX_DELAY_MS      = 3000;
-const MAX_RECONNECTS    = 5;
+const PORT = parseInt(process.env.PORT || process.env.WHATSAPP_PORT || '3001', 10);
+const WHATSAPP_ENABLED = process.env.WHATSAPP_ENABLED === 'true';
+const DAILY_LIMIT = parseInt(process.env.WHATSAPP_DAILY_SEND_LIMIT || '200', 10);
+const AUTH_DIR = path.join(__dirname, 'auth_info_baileys');
+const MIN_DELAY_MS = 1500;
+const MAX_DELAY_MS = 3000;
+const MAX_RECONNECTS = 5;
 
 let dailySendCount = 0;
 let dailyResetDate = new Date().toDateString();
@@ -55,7 +55,7 @@ async function connectToWhatsApp() {
   }
 
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  const { version }          = await fetchLatestBaileysVersion();
+  const { version } = await fetchLatestBaileysVersion();
 
   console.log(`[WhatsApp] Using Baileys v${version.join('.')}`);
 
@@ -63,7 +63,7 @@ async function connectToWhatsApp() {
     version,
     auth: {
       creds: state.creds,
-      keys:  makeCacheableSignalKeyStore(state.keys, console),
+      keys: makeCacheableSignalKeyStore(state.keys, console),
     },
     printQRInTerminal: false,
     browser: ['Reminder Service', 'Chrome', '1.0.0'],
@@ -84,8 +84,8 @@ async function connectToWhatsApp() {
     }
 
     if (connection === 'open') {
-      isConnected      = true;
-      latestQrDataUrl  = null;
+      isConnected = true;
+      latestQrDataUrl = null;
       reconnectAttempts = 0;
       console.log('[WhatsApp] ✓ Connected and ready to send messages.');
     }
@@ -134,10 +134,10 @@ app.use(express.json());
 app.get('/health', (_req, res) => {
   res.json({
     ok: true,
-    whatsappEnabled:  WHATSAPP_ENABLED,
-    connected:        isConnected,
+    whatsappEnabled: WHATSAPP_ENABLED,
+    connected: isConnected,
     dailySendCount,
-    dailyLimit:       DAILY_LIMIT,
+    dailyLimit: DAILY_LIMIT,
   });
 });
 
@@ -150,7 +150,7 @@ app.get('/logout', async (_req, res) => {
     isConnected = false;
     latestQrDataUrl = null;
     if (sock) {
-      try { sock.end(undefined); } catch (_) {}
+      try { sock.end(undefined); } catch (_) { }
     }
     if (fs.existsSync(AUTH_DIR)) {
       const files = fs.readdirSync(AUTH_DIR);

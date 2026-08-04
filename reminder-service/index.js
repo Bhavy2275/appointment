@@ -246,28 +246,19 @@ async function run() {
       if (appointment.customer_email && appointment.customer_email.trim() !== '') {
         try {
           const emailHtml = `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-              <h2 style="color: #4f46e5; margin-top: 0;">Appointment Reminder</h2>
-              <p>Hi <strong>${appointment.customer_name}</strong>,</p>
-              <p>This is a reminder for your upcoming appointment with <strong>${businessName}</strong>.</p>
-              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; color: #64748b;"><strong>Business:</strong></td>
-                  <td style="padding: 8px 0;">${businessName}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #64748b;"><strong>Date:</strong></td>
-                  <td style="padding: 8px 0;">${dateFormatted}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; color: #64748b;"><strong>Time:</strong></td>
-                  <td style="padding: 8px 0;">${timeFormatted}</td>
-                </tr>
-              </table>
-              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-              <p style="font-size: 0.875rem; color: #64748b; margin-bottom: 0;">
-                If you need to reschedule or cancel, please contact us. We look forward to seeing you soon!
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background-color: #101566; color: #ffffff; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800;">DAM Lighting Solutions</h2>
+                <p style="color: #EEF2F6; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; font-weight: 600;">VR World Session Reminder</p>
+              </div>
+              <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.15); margin: 20px 0;" />
+              <p style="font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 12px;">Hi ${appointment.customer_name},</p>
+              <p style="font-size: 16px; color: #ffffff; font-weight: 700; margin-bottom: 12px;"><em>Your VR experience is ready.</em></p>
+              <p style="font-size: 15px; color: #EEF2F6; margin-bottom: 8px;">It begins in 5 minutes.</p>
+              <p style="font-size: 15px; color: #ffffff; font-weight: 600; margin-bottom: 20px;">Please make your way to Stall: H11- 0208.</p>
+              <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.15); margin: 20px 0;" />
+              <p style="font-size: 13px; color: #D1D5DB; margin: 0; font-weight: 500;">
+                DAM Lighting Solutions Team looks forward to take you to the World of Lighting.
               </p>
             </div>
           `;

@@ -1,11 +1,12 @@
 import { Metadata } from 'next';
 import { getAvailableTimeSlots } from '@/lib/actions';
 import BookingContainer from '@/components/BookingContainer';
-import { Calendar, Clock, MapPin, Shield } from 'lucide-react';
+import DamLogo from '@/components/DamLogo';
+import { Clock, MapPin, Sparkles } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'Book an Appointment | Quick, Simple & Secure',
-  description: 'Schedule your session easily. Select an available time slot, fill out your guest info, and receive instant email confirmations and reminders.',
+  title: 'DAM Lighting Solutions | VR World Session Booking',
+  description: 'Book your immersive VR experience with DAM Lighting Solutions. Select an available slot to reserve your session.',
 };
 
 export const revalidate = 0; // Disable static caching so slots are always up to date
@@ -13,33 +14,38 @@ export const revalidate = 0; // Disable static caching so slots are always up to
 export default async function Home() {
   const availableSlots = await getAvailableTimeSlots();
 
-  const businessName = process.env.NEXT_PUBLIC_BUSINESS_NAME || 'Aura Wellness';
-  const businessLocation = process.env.NEXT_PUBLIC_BUSINESS_LOCATION || '123 Wellness Way, Cityville';
+  const businessName = process.env.NEXT_PUBLIC_BUSINESS_NAME || 'DAM Lighting Solutions';
+  const businessLocation = process.env.NEXT_PUBLIC_BUSINESS_LOCATION || 'Stall H11- 0208';
 
   return (
-    <div className="relative min-h-screen bg-black text-zinc-100 flex flex-col justify-between overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#101566] text-white flex flex-col justify-between overflow-x-hidden font-sans">
       {/* Main Layout Wrapper */}
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10 flex-grow flex flex-col justify-center">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10 flex-grow flex flex-col justify-center">
+        
+        {/* Top Branding Navigation Pill */}
+        <div className="flex items-center justify-between mb-10 pb-4 border-b border-white/10">
+          <DamLogo variant="header" />
+          <div className="hidden sm:flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#EEF2F6]/90 bg-white/10 px-4 py-2 rounded-full border border-white/15">
+            <Sparkles className="w-3.5 h-3.5 text-[#EEF2F6]" /> Immersive VR World
+          </div>
+        </div>
+
         {/* Header Hero Section */}
-        <header className="text-center mb-12 max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-200 text-xs font-semibold mb-4 tracking-wider uppercase">
-            <Clock className="w-3.5 h-3.5" /> Book Online In Under 1 Minute
+        <header className="text-center mb-10 max-w-2xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-[#EEF2F6] text-xs font-semibold mb-5 tracking-widest uppercase">
+            <Clock className="w-3.5 h-3.5" /> Book Your VR Experience
           </div>
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white mb-4">
             {businessName}
           </h1>
-          <p className="text-zinc-400 text-base sm:text-lg mb-6 leading-relaxed">
-            Welcome! Select a date and time slot below to secure your session. No account or registration is required.
+          <p className="text-white/80 text-base sm:text-lg mb-6 leading-relaxed font-normal">
+            Step inside. Explore. Experience lighting like never before. Select an available time slot below to reserve your 15-minute VR session.
           </p>
 
           {/* Quick Business Details */}
-          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-zinc-500 font-medium">
-            <span className="flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-zinc-400" /> {businessLocation}
-            </span>
-            <span className="h-4 w-px bg-zinc-800 hidden sm:inline" />
-            <span className="flex items-center gap-1.5">
-              <Shield className="w-4 h-4 text-zinc-400" /> Guest Checkout Enabled
+          <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-white/70 font-medium">
+            <span className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+              <MapPin className="w-4 h-4 text-white" /> Location: {businessLocation}
             </span>
           </div>
         </header>
@@ -51,11 +57,12 @@ export default async function Home() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-zinc-900 bg-black py-6 text-center text-xs text-zinc-700 tracking-wider font-semibold uppercase relative z-10">
-        <p className="max-w-7xl mx-auto px-4">
-          &copy; {new Date().getFullYear()} {businessName}. All rights reserved. &bull;
-          <a href="/admin" className="ml-2 text-zinc-400 hover:text-white hover:underline transition-all">
-            Admin Login
+      <footer className="border-t border-white/10 bg-[#0B0E42] py-6 text-center text-xs text-white/60 tracking-wider font-semibold uppercase relative z-10">
+        <p className="max-w-7xl mx-auto px-4 flex items-center justify-center gap-3 flex-wrap">
+          <span>&copy; {new Date().getFullYear()} {businessName}. All rights reserved.</span>
+          <span>&bull;</span>
+          <a href="/admin" className="text-white/80 hover:text-white underline transition-all">
+            Admin Portal
           </a>
         </p>
       </footer>

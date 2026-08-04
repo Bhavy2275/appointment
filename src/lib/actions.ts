@@ -221,38 +221,24 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
     })}`;
 
     const emailHtml = `
-      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-        <h2 style="color: #4f46e5; margin-top: 0;">Appointment Confirmed!</h2>
-        <p>Hi <strong>${input.name}</strong>,</p>
-        <p>Thank you for booking with us. Your appointment has been successfully scheduled.</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 8px 0; color: #64748b;"><strong>Business:</strong></td>
-            <td style="padding: 8px 0;">${businessName}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b;"><strong>Location:</strong></td>
-            <td style="padding: 8px 0;">${businessLocation}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b;"><strong>Date:</strong></td>
-            <td style="padding: 8px 0;">${dateFormatted}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b;"><strong>Time:</strong></td>
-            <td style="padding: 8px 0;">${timeFormatted}</td>
-          </tr>
-          ${input.reason ? `
-          <tr>
-            <td style="padding: 8px 0; color: #64748b;"><strong>Service/Reason:</strong></td>
-            <td style="padding: 8px 0;">${input.reason}</td>
-          </tr>
-          ` : ''}
-        </table>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p style="font-size: 0.875rem; color: #64748b; margin-bottom: 0;">
-          If you need to reschedule or cancel, please contact us directly. We look forward to seeing you!
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background-color: #101566; color: #ffffff; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800;">DAM Lighting Solutions</h2>
+          <p style="color: #EEF2F6; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; font-weight: 600;">VR World Session Booking</p>
+        </div>
+        <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.15); margin: 20px 0;" />
+        <p style="font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 12px;">Hi ${input.name},</p>
+        <p style="font-size: 15px; color: #EEF2F6; margin-bottom: 12px;">Welcome to the <strong>DAM Lighting Solutions</strong> VR World.</p>
+        <p style="font-size: 15px; color: #ffffff; font-weight: 700; margin-bottom: 8px;"><em>Your immersive VR experience awaits.</em></p>
+        <p style="font-size: 14px; color: #D1D5DB; font-style: italic; margin-bottom: 20px;">Step inside. Explore. Experience lighting like never before.</p>
+        <div style="background-color: #0B0E42; padding: 18px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); margin-bottom: 20px;">
+          <p style="font-size: 15px; color: #ffffff; margin: 0 0 6px 0; font-weight: 600;">${dateFormatted}</p>
+          <p style="font-size: 14px; color: #EEF2F6; margin: 0 0 6px 0;">time ${timeFormatted}</p>
+          <p style="font-size: 14px; color: #ffffff; margin: 0; font-weight: 600;">📍Stall H11- 0208</p>
+        </div>
+        <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.15); margin: 20px 0;" />
+        <p style="font-size: 13px; color: #D1D5DB; margin: 0;">
+          We look forward to seeing you at the DAM Lighting Solutions VR World!
         </p>
       </div>
     `;
