@@ -10,7 +10,6 @@ interface BookingContainerProps {
 }
 
 export default function BookingContainer({ initialSlots }: BookingContainerProps) {
-  const [activeTab, setActiveTab] = useState<'book' | 'scan'>('book');
   const [slots, setSlots] = useState<TimeSlot[]>(initialSlots);
   const [selectedDateStr, setSelectedDateStr] = useState<string>('');
   const [selectedSlotTime, setSelectedSlotTime] = useState<string>('');
@@ -209,43 +208,7 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
   };
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto font-sans">
-      {/* Tab Switcher Header */}
-      <div className="flex justify-center mb-4">
-        <div className="inline-flex p-1.5 bg-[#0B0E42]/90 border border-white/20 rounded-2xl shadow-xl backdrop-blur-md">
-          <button
-            onClick={() => setActiveTab('book')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all cursor-pointer ${
-              activeTab === 'book'
-                ? 'bg-[#EEF2F6] text-[#101566] shadow-md'
-                : 'text-white/70 hover:text-white'
-            }`}
-          >
-            <Calendar className="w-4 h-4" /> Reserve Slot
-          </button>
-          <button
-            onClick={() => setActiveTab('scan')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all cursor-pointer ${
-              activeTab === 'scan'
-                ? 'bg-[#EEF2F6] text-[#101566] shadow-md'
-                : 'text-white/70 hover:text-white'
-            }`}
-          >
-            <ScanLine className="w-4 h-4" /> Scan Any QR Code
-          </button>
-        </div>
-      </div>
-
-      {/* QR Scanner Tab View */}
-      {activeTab === 'scan' ? (
-        <div className="max-w-xl mx-auto animate-fade-in">
-          <div className="bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-md">
-            <QrScanner />
-          </div>
-        </div>
-      ) : (
-        /* Reserve Slot Grid View */
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-fade-in">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-6xl mx-auto items-start font-sans">
       {/* Date & Time Selection (Left/Larger panel) */}
       <div className="lg:col-span-7 bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-md">
         <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2 tracking-tight">
@@ -502,7 +465,5 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
         </form>
       </div>
     </div>
-  )}
-</div>
-);
+  );
 }
