@@ -65,7 +65,13 @@ async function sendSms(appointment, dateFormatted, timeFormatted) {
 async function sendWhatsApp(appointment, phone, dateFormatted, timeFormatted) {
   if (!whatsappEnabled) return false;
 
-  const normalisedPhone = (phone || '').replace(/\D/g, '');
+  let normalisedPhone = (phone || '').replace(/\D/g, '');
+  if (normalisedPhone.startsWith('0')) {
+    normalisedPhone = normalisedPhone.replace(/^0+/, '');
+  }
+  if (normalisedPhone.length === 10) {
+    normalisedPhone = '91' + normalisedPhone;
+  }
   if (!normalisedPhone) {
     console.warn(`[WhatsApp] Skipped for appointment ${appointment.id}: no phone number.`);
     return false;

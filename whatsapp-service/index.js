@@ -234,6 +234,9 @@ app.post('/send', async (req, res) => {
   }
 
   let normalised = phone.replace(/\D/g, '');
+  if (normalised.startsWith('0')) {
+    normalised = normalised.replace(/^0+/, '');
+  }
   if (normalised.length === 10) {
     normalised = '91' + normalised;
   }

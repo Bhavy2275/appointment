@@ -315,7 +315,13 @@ time ${timeFormatted}
 
         const sendSingleWa = async (targetPhone: string) => {
           try {
-            const rawPhone = (targetPhone || '').replace(/\D/g, '');
+            let rawPhone = (targetPhone || '').replace(/\D/g, '');
+            if (rawPhone.startsWith('0')) {
+              rawPhone = rawPhone.replace(/^0+/, '');
+            }
+            if (rawPhone.length === 10) {
+              rawPhone = '91' + rawPhone;
+            }
             if (rawPhone) {
               const res = await fetch(`${waUrl}/send`, {
                 method: 'POST',
