@@ -63,6 +63,13 @@ export default async function Home() {
       <footer className="border-t border-white/10 bg-[#0B0E42] py-6 text-center text-xs text-white/60 tracking-wider font-semibold uppercase relative z-10">
         <p className="max-w-7xl mx-auto px-4 flex items-center justify-center gap-3 flex-wrap">
           <span>&copy; {new Date().getFullYear()} {businessName}. All rights reserved.</span>
+          <span className="text-white/20">·</span>
+          <a
+            href="/admin"
+            className="text-white/30 hover:text-white/70 transition-colors duration-200 normal-case tracking-normal font-medium"
+          >
+            Admin
+          </a>
         </p>
       </footer>
     </div>

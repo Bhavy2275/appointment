@@ -88,6 +88,52 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [excelDownloading, setExcelDownloading] = useState(false);
 
+  // --- BULK DELETE STATE ---
+  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+  const [deleteByDate, setDeleteByDate] = useState('');
+  const [deleteByDateMode, setDeleteByDateMode] = useState<'empty' | 'all'>('empty');
+
+  const toggleSlotSelection = (slotId: string) => {
+    setSelectedSlots((prev) => {
+      const next = new Set(prev);
+      if (next.has(slotId)) next.delete(slotId);
+      else next.add(slotId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedSlots.size === data.length) {
+      setSelectedSlots(new Set());
+    } else {
+      setSelectedSlots(new Set(data.map((s) => s.slot_id)));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedSlots.size === 0) return;
+    const hasBooked = data.some((s) => selectedSlots.has(s.slot_id) && !!s.appointment_id);
+    const confirmMsg = hasBooked
+      ? `WARNING: Some selected slots are BOOKED. Deleting them will also CANCEL the appointments.\nDelete ${selectedSlots.size} slot(s)?`
+      : `Delete ${selectedSlots.size} selected slot(s)?`;
+    if (!confirm(confirmMsg)) return;
+
+    const ids = Array.from(selectedSlots);
+    startTransition(async () => {
+      let successCount = 0;
+      let failCount = 0;
+      for (const id of ids) {
+        const result = await deleteTimeSlot(id);
+        if (result.success) successCount++;
+        else failCount++;
+      }
+      setSelectedSlots(new Set());
+      if (failCount === 0) showNotification('success', `✓ Deleted ${successCount} slot(s).`);
+      else showNotification('error', `Deleted ${successCount}, failed ${failCount}.`);
+      refreshData();
+    });
+  };
+
   const handleDownloadExcel = async () => {
     setExcelDownloading(true);
     try {
@@ -818,13 +864,140 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                 </button>
               </form>
             </div>
+
+            {/* Delete by Date Panel */}
+            <div className="bg-[#0B0E42]/80 border border-red-900/40 rounded-3xl p-6 shadow-2xl backdrop-blur-md">
+              <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-red-400" /> Delete Slots by Date
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-white/70 uppercase tracking-wider mb-2">Date</label>
+                  <input
+                    type="text"
+                    placeholder="DD/MM/YYYY"
+                    maxLength={10}
+                    value={deleteByDate}
+                    onChange={(e) => setDeleteByDate(e.target.value)}
+                    className="w-full bg-[#080A30]/90 border border-white/20 focus:border-red-400 rounded-xl p-3 text-white outline-none text-sm transition-all placeholder-white/30"
+                  />
+                  {deleteByDate && deleteByDate.match(/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/) && (() => {
+                    const [d, m, y] = deleteByDate.split(/[\/\-]/).map(Number);
+                    const parsed = new Date(y, m - 1, d);
+                    return !isNaN(parsed.getTime()) ? (
+                      <p className="text-xs text-white/60 mt-1 font-medium">
+                        ✓ {parsed.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                      </p>
+                    ) : null;
+                  })()}
+                </div>
+
+                {/* Live slot list — renders as soon as a valid date is typed */}
+                {(() => {
+                  if (!deleteByDate || !deleteByDate.match(/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/)) return null;
+                  const [d, m, y] = deleteByDate.split(/[\/\-]/).map(Number);
+                  const parsed = new Date(y, m - 1, d);
+                  if (isNaN(parsed.getTime())) return null;
+
+                  const slotsForDate = data.filter((s) => {
+                    const sd = new Date(s.slot_time);
+                    return sd.getFullYear() === y && sd.getMonth() === m - 1 && sd.getDate() === d;
+                  });
+
+                  if (slotsForDate.length === 0) {
+                    return (
+                      <div className="flex items-center gap-2 text-xs text-white/40 py-3 border border-white/10 rounded-xl px-4">
+                        <Clock className="w-3.5 h-3.5" /> No slots found for this date.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-white/60 uppercase tracking-wider">
+                          {slotsForDate.length} slot{slotsForDate.length !== 1 ? 's' : ''} found
+                        </p>
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => {
+                            const hasBooked = slotsForDate.some((s) => !!s.appointment_id);
+                            const msg = hasBooked
+                              ? `WARNING: Some slots are BOOKED — deleting will cancel appointments.\nDelete all ${slotsForDate.length} slot(s)?`
+                              : `Delete all ${slotsForDate.length} slot(s) for ${parsed.toLocaleDateString('en-IN', { dateStyle: 'medium' })}?`;
+                            if (!confirm(msg)) return;
+                            startTransition(async () => {
+                              let ok = 0, fail = 0;
+                              for (const s of slotsForDate) {
+                                const r = await deleteTimeSlot(s.slot_id);
+                                r.success ? ok++ : fail++;
+                              }
+                              setDeleteByDate('');
+                              if (fail === 0) showNotification('success', `✓ Deleted ${ok} slot(s).`);
+                              else showNotification('error', `Deleted ${ok}, failed ${fail}.`);
+                              refreshData();
+                            });
+                          }}
+                          className="flex items-center gap-1 text-xs font-extrabold uppercase tracking-wider px-3 py-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-60 text-white rounded-lg transition-all cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" /> Delete All
+                        </button>
+                      </div>
+
+                      <div className="divide-y divide-white/5 border border-white/10 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+                        {slotsForDate.map((s) => {
+                          const t = new Date(s.slot_time);
+                          const timeStr = t.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                          const isBooked = !!s.appointment_id;
+                          return (
+                            <div key={s.slot_id} className="flex items-center justify-between px-3 py-2.5 bg-[#080A30]/60 hover:bg-[#080A30]/90 transition-all">
+                              <div className="flex items-center gap-2">
+                                <Clock className={`w-3.5 h-3.5 flex-shrink-0 ${isBooked ? 'text-amber-400' : 'text-zinc-500'}`} />
+                                <div className="text-xs">
+                                  <span className="font-semibold text-zinc-200" suppressHydrationWarning>{timeStr}</span>
+                                  {isBooked
+                                    ? <span className="ml-2 text-amber-400/80 font-medium">· Booked ({s.customer_name})</span>
+                                    : <span className="ml-2 text-zinc-500">· Available</span>
+                                  }
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={isPending}
+                                onClick={() => handleDeleteSlot(s.slot_id, isBooked)}
+                                className="p-1.5 rounded-lg bg-red-900/30 hover:bg-red-700 text-red-400 hover:text-white border border-red-900/40 transition-all cursor-pointer disabled:opacity-50 flex-shrink-0"
+                                title="Delete this slot"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
 
           {/* Slots List (Right) */}
           <div className="lg:col-span-7 bg-[#0B0E42]/80 border border-white/15 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-md">
             <div className="py-4 px-6 bg-[#080A30]/90 border-b border-white/15 flex items-center justify-between">
               <h2 className="text-base font-bold text-white">Configured Time Slots</h2>
-              <span className="text-xs text-white/60 font-semibold">{data.length} total slots</span>
+              <div className="flex items-center gap-3">
+                {selectedSlots.size > 0 && (
+                  <button
+                    onClick={handleDeleteSelected}
+                    disabled={isPending}
+                    className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider px-3 py-1.5 bg-red-700 hover:bg-red-600 disabled:opacity-60 text-white rounded-xl transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete {selectedSlots.size} Selected
+                  </button>
+                )}
+                <span className="text-xs text-white/60 font-semibold">{data.length} total slots</span>
+              </div>
             </div>
             {data.length === 0 ? (
               <div className="text-center py-16 px-4">
@@ -834,6 +1007,17 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
               </div>
             ) : (
               <div className="divide-y divide-zinc-850 max-h-[600px] overflow-y-auto">
+                {/* Select-all header row */}
+                <div className="px-4 py-2 bg-[#080A30]/60 flex items-center gap-3 text-xs text-white/50 font-semibold uppercase tracking-wider">
+                  <input
+                    type="checkbox"
+                    className="w-3.5 h-3.5 accent-white cursor-pointer"
+                    checked={selectedSlots.size === data.length && data.length > 0}
+                    onChange={toggleSelectAll}
+                    title="Select / deselect all"
+                  />
+                  <span>Select All</span>
+                </div>
                 {data.map((item) => {
                   const dateObj = new Date(item.slot_time);
                   const endDateObj = new Date(dateObj.getTime() + 15 * 60000);
@@ -854,10 +1038,17 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                   const formattedDateTime = `${formattedDate} @ ${startTimeStr} - ${endTimeStr}`;
 
                   const isBooked = !!item.appointment_id;
+                  const isSelected = selectedSlots.has(item.slot_id);
 
                   return (
-                    <div key={item.slot_id} className="p-4 flex items-center justify-between hover:bg-zinc-900/10 transition-all text-sm">
+                    <div key={item.slot_id} className={`p-4 flex items-center justify-between hover:bg-zinc-900/10 transition-all text-sm ${isSelected ? 'bg-red-950/20' : ''}`}>
                       <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSlotSelection(item.slot_id)}
+                          className="w-3.5 h-3.5 accent-white cursor-pointer flex-shrink-0"
+                        />
                         <Clock className={`w-4 h-4 ${isBooked ? 'text-zinc-300' : 'text-zinc-600'}`} />
                         <div>
                           <p className="font-semibold text-zinc-200" suppressHydrationWarning>{formattedDateTime}</p>
@@ -890,7 +1081,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                         )}
                         <button
                           onClick={() => handleDeleteSlot(item.slot_id, isBooked)}
-                          className="p-1.5 bg-zinc-950/60 hover:bg-zinc-800 text-zinc-500 hover:text-white border border-zinc-800 rounded-lg transition-all cursor-pointer"
+                          className="p-1.5 bg-zinc-950/60 hover:bg-red-900/60 text-zinc-500 hover:text-red-300 border border-zinc-800 rounded-lg transition-all cursor-pointer"
                           title="Delete slot"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
