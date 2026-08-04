@@ -163,6 +163,16 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
           </div>
         </div>
 
+        {/* QR Code Scanner Section after Booking */}
+        <div className="bg-[#0B0E42]/80 border border-white/15 rounded-3xl p-6 mb-6 text-left space-y-4 backdrop-blur-md shadow-2xl">
+          <div className="flex items-center gap-2 mb-1">
+            <ScanLine className="w-4 h-4 text-[#EEF2F6]" />
+            <p className="text-white font-extrabold text-sm uppercase tracking-widest">QR Code Scanner</p>
+          </div>
+          <p className="text-white/60 text-xs mb-3">Scan any QR code using camera or upload a QR image</p>
+          <QrScanner />
+        </div>
+
         {/* Book Another */}
         <button
           onClick={() => {
