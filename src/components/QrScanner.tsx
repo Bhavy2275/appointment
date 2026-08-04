@@ -36,9 +36,16 @@ export default function QrScanner() {
     setError('');
     setScanResult(null);
     setLoading(true);
+    setIsStarted(true);
 
     try {
+      // Allow React to mount #qr-scanner-container in the DOM
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
       const { Html5Qrcode } = await import('html5-qrcode');
+      const container = document.getElementById('qr-scanner-container');
+      if (!container) throw new Error('Scanner container element not ready');
+
       const scanner = new Html5Qrcode('qr-scanner-container');
       scannerRef.current = scanner;
 
@@ -69,9 +76,16 @@ export default function QrScanner() {
         },
         undefined
       );
-      setIsStarted(true);
     } catch (e: any) {
-      setError('Camera access denied or unavailable. Please allow camera permissions.');
+      setIsStarted(false);
+      const errMsg = e?.toString() || '';
+      if (errMsg.includes('NotAllowedError') || errMsg.includes('Permission')) {
+        setError('Camera permission denied. Please allow camera access in your browser settings.');
+      } else if (errMsg.includes('NotFoundError') || errMsg.includes('DevicesNotFoundError')) {
+        setError('No camera detected on this device.');
+      } else {
+        setError(e?.message || 'Camera access unavailable. Try the "Upload Image" option below.');
+      }
     } finally {
       setLoading(false);
     }
