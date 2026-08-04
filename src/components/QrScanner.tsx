@@ -95,6 +95,48 @@ export default function QrScanner() {
 
   const tz = 'Asia/Kolkata';
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError('');
+    setScanResult(null);
+    setLoading(true);
+
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      let container = document.getElementById('qr-file-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'qr-file-container';
+        container.style.display = 'none';
+        document.body.appendChild(container);
+      }
+      const html5QrCode = new Html5Qrcode('qr-file-container');
+      const decodedText = await html5QrCode.scanFile(file, false);
+      
+      let bookingId = decodedText;
+      const match = decodedText.match(/\/verify\/([a-f0-9-]+)/i);
+      if (match) bookingId = match[1];
+
+      const res = await fetch(`/api/verify/${bookingId}`);
+      if (!res.ok) throw new Error('Ticket not found');
+      const data = await res.json();
+      setScanResult({
+        id: bookingId,
+        name: data.customer_name,
+        status: data.status,
+        slotTime: data.slot_time,
+        checkedIn: false,
+      });
+      html5QrCode.clear();
+    } catch (err: any) {
+      setError('Could not read QR code from image. Please ensure image is clear or try live camera scanner.');
+    } finally {
+      setLoading(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Scanner Viewport */}
@@ -117,22 +159,35 @@ export default function QrScanner() {
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center gap-5 py-12 bg-[#080A30]/60 border border-white/10 rounded-2xl">
+        <div className="flex flex-col items-center justify-center gap-5 py-10 px-4 bg-[#080A30]/60 border border-white/10 rounded-2xl">
           <div className="p-5 bg-[#0B0E42] rounded-2xl border border-white/15">
             <ScanLine className="w-10 h-10 text-[#EEF2F6]" />
           </div>
           <div className="text-center">
             <p className="text-white font-bold text-base">Stall Check-In Scanner</p>
-            <p className="text-white/50 text-xs mt-1">Point camera at guest's QR ticket</p>
+            <p className="text-white/50 text-xs mt-1">Point camera or upload a photo of guest's QR ticket</p>
           </div>
-          <button
-            onClick={startScanner}
-            disabled={loading}
-            className="flex items-center gap-2 px-6 py-3 bg-[#EEF2F6] hover:bg-white text-[#101566] font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all active:scale-95 cursor-pointer disabled:opacity-60"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
-            {loading ? 'Starting Camera…' : 'Start Scanner'}
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-xs">
+            <button
+              onClick={startScanner}
+              disabled={loading}
+              className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-[#EEF2F6] hover:bg-white text-[#101566] font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all active:scale-95 cursor-pointer disabled:opacity-60"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
+              {loading ? 'Starting…' : 'Live Camera'}
+            </button>
+            
+            <label className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer text-center">
+              Upload Image
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
         </div>
       )}
 
