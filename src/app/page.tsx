@@ -14,8 +14,11 @@ export const revalidate = 0; // Disable static caching so slots are always up to
 export default async function Home() {
   const availableSlots = await getAvailableTimeSlots();
 
-  const businessName = process.env.NEXT_PUBLIC_BUSINESS_NAME || 'DAM Lighting Solutions';
-  const businessLocation = process.env.NEXT_PUBLIC_BUSINESS_LOCATION || 'Stall H11- 0208';
+  const envName = process.env.NEXT_PUBLIC_BUSINESS_NAME;
+  const businessName = (envName && envName !== 'ABC' && envName !== 'Aura Wellness') ? envName : 'DAM';
+
+  const envLoc = process.env.NEXT_PUBLIC_BUSINESS_LOCATION;
+  const businessLocation = (envLoc && !envLoc.includes('ABC') && !envLoc.includes('Cityville')) ? envLoc : 'Stall: H11- 0208';
 
   return (
     <div className="relative min-h-screen bg-[#101566] text-white flex flex-col justify-between overflow-x-hidden font-sans">
