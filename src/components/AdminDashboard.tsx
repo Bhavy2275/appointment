@@ -12,6 +12,13 @@ import {
   updateAppointmentStatus, updateAppointmentDetails, 
   adminBookAppointment, logoutAdmin, exportUsersWithScans
 } from '@/lib/actions';
+import {
+  createBusinessTimeIso,
+  formatSlotDate,
+  formatSlotTime,
+  formatSlotRange,
+  getKolkataDateString,
+} from '@/lib/timezone';
 
 interface AdminSlotRow {
   slot_id: string;
@@ -47,6 +54,14 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
   useEffect(() => {
     setData(initialSlots);
   }, [initialSlots]);
+
+  // Periodic auto-refresh every 5 seconds so Admin dashboard reflects new bookings in real time
+  useEffect(() => {
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [router]);
   const [activeTab, setActiveTab] = useState<'appointments' | 'slots'>('appointments');
   const [isPending, startTransition] = useTransition();
 
@@ -154,9 +169,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
 
       // Build data rows
       const rows = result.data.map((row) => {
-        const slotFormatted = new Date(row.slotTime).toLocaleString('en-IN', {
-          dateStyle: 'medium', timeStyle: 'short',
-        });
+        const slotFormatted = `${formatSlotDate(row.slotTime, 'medium')} at ${formatSlotTime(row.slotTime)}`;
         const scanCols = Array.from({ length: maxScans }, (_, i) => row.scans[i] || '');
         return [row.name, row.email, row.phone, row.alternativePhone, slotFormatted, row.status, ...scanCols];
       });
@@ -224,20 +237,13 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
     }
 
-    localDate = new Date(year, month, day, hours, minutes, 0);
-
-    if (isNaN(localDate.getTime())) {
-      showNotification('error', 'Invalid date or time value. Use HH:MM format.');
-      return;
-    }
-
-    const dateTimeStr = localDate.toISOString();
-    console.log('[SlotCreate] Sending dateTimeStr:', dateTimeStr, '| Local:', localDate.toLocaleString());
+    const dateTimeStr = createBusinessTimeIso(year, month, day, hours, minutes);
+    console.log('[SlotCreate] Sending dateTimeStr:', dateTimeStr);
     startTransition(async () => {
       const result = await createTimeSlots([dateTimeStr]);
       console.log('[SlotCreate] Result:', result);
       if (result.success && result.count && result.count > 0) {
-        showNotification('success', `✓ Slot created: ${localDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`);
+        showNotification('success', `✓ Slot created: ${formatSlotDate(dateTimeStr, 'medium')} at ${formatSlotTime(dateTimeStr)}`);
         setSingleDate('');
         setSingleTime('');
         refreshData();
@@ -245,7 +251,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
         showNotification('error', 'Session expired. Redirecting to login...');
         setTimeout(() => router.push('/admin/login'), 2000);
       } else if (result.success && (!result.count || result.count === 0)) {
-        showNotification('error', `Slot already exists for ${localDate.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} — pick a different time.`);
+        showNotification('error', `Slot already exists for ${formatSlotDate(dateTimeStr, 'medium')} at ${formatSlotTime(dateTimeStr)} — pick a different time.`);
       } else {
         showNotification('error', result.error || 'Failed to create slot.');
       }
@@ -304,16 +310,14 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       for (let m = startMinutes; m <= endMinutes; m += interval) {
         const hours = Math.floor(m / 60);
         const mins = m % 60;
-        const localDate = new Date(year, month, day, hours, mins, 0);
-        slotTimes.push(localDate.toISOString());
+        slotTimes.push(createBusinessTimeIso(year, month, day, hours, mins));
       }
     } else {
       // Range spans across midnight
       for (let m = startMinutes; m < 1440; m += interval) {
         const hours = Math.floor(m / 60);
         const mins = m % 60;
-        const localDate = new Date(year, month, day, hours, mins, 0);
-        slotTimes.push(localDate.toISOString());
+        slotTimes.push(createBusinessTimeIso(year, month, day, hours, mins));
       }
       
       const nextDayObj = new Date(year, month, day + 1);
@@ -330,8 +334,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
       for (let m = nextDayStartMin; m <= endMinutes; m += interval) {
         const hours = Math.floor(m / 60);
         const mins = m % 60;
-        const localDate = new Date(nextYear, nextMonth, nextDay, hours, mins, 0);
-        slotTimes.push(localDate.toISOString());
+        slotTimes.push(createBusinessTimeIso(nextYear, nextMonth, nextDay, hours, mins));
       }
     }
 
@@ -606,17 +609,8 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                   </thead>
                   <tbody className="divide-y divide-zinc-850">
                     {sortedAppointments.map((item) => {
-                      const dateObj = new Date(item.slot_time);
-                      const formattedDate = dateObj.toLocaleDateString('en-US', {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      });
-                      const formattedTime = dateObj.toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      });
+                      const formattedDate = formatSlotDate(item.slot_time, 'medium');
+                      const formattedTime = formatSlotTime(item.slot_time);
 
                       return (
                         <tr key={item.appointment_id} className="hover:bg-zinc-900/20 transition-all text-sm">
@@ -899,10 +893,8 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                   const parsed = new Date(y, m - 1, d);
                   if (isNaN(parsed.getTime())) return null;
 
-                  const slotsForDate = data.filter((s) => {
-                    const sd = new Date(s.slot_time);
-                    return sd.getFullYear() === y && sd.getMonth() === m - 1 && sd.getDate() === d;
-                  });
+                  const targetDateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                  const slotsForDate = data.filter((s) => getKolkataDateString(s.slot_time) === targetDateStr);
 
                   if (slotsForDate.length === 0) {
                     return (
@@ -947,8 +939,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
 
                       <div className="divide-y divide-white/5 border border-white/10 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
                         {slotsForDate.map((s) => {
-                          const t = new Date(s.slot_time);
-                          const timeStr = t.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                          const timeStr = formatSlotTime(s.slot_time);
                           const isBooked = !!s.appointment_id;
                           return (
                             <div key={s.slot_id} className="flex items-center justify-between px-3 py-2.5 bg-[#080A30]/60 hover:bg-[#080A30]/90 transition-all">
@@ -1019,23 +1010,7 @@ export default function AdminDashboard({ initialSlots }: AdminDashboardProps) {
                   <span>Select All</span>
                 </div>
                 {data.map((item) => {
-                  const dateObj = new Date(item.slot_time);
-                  const endDateObj = new Date(dateObj.getTime() + 15 * 60000);
-                  
-                  const formattedDate = dateObj.toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                  });
-                  const startTimeStr = dateObj.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
-                  const endTimeStr = endDateObj.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
-                  const formattedDateTime = `${formattedDate} @ ${startTimeStr} - ${endTimeStr}`;
+                  const formattedDateTime = `${formatSlotDate(item.slot_time, 'medium')} @ ${formatSlotRange(item.slot_time, 15)}`;
 
                   const isBooked = !!item.appointment_id;
                   const isSelected = selectedSlots.has(item.slot_id);

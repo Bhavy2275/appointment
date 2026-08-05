@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { Resend } from 'resend';
 import { query } from './db';
+import { formatSlotDate, formatSlotRange } from './timezone';
 
 // Initialize Resend
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key');
@@ -203,24 +204,8 @@ export async function bookAppointment(input: BookingInput): Promise<{ success: b
     const appointmentId = result.rows[0].id;
 
     // 5. Send instant confirmation email (SMTP or Resend)
-    const businessTimezone = process.env.BUSINESS_TIMEZONE || 'Asia/Kolkata';
-    const dateFormatted = slotDate.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      timeZone: businessTimezone
-    });
-    const timeFormatted = `${slotDate.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: businessTimezone
-    })} - ${new Date(slotDate.getTime() + 15 * 60000).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: businessTimezone,
-      timeZoneName: 'short'
-    })}`;
+    const dateFormatted = formatSlotDate(slotDate, 'full');
+    const timeFormatted = formatSlotRange(slotDate, 15, true);
 
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background-color: #101566; color: #ffffff; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">

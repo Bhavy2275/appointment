@@ -2,6 +2,7 @@ import { getAppointmentById } from '@/lib/actions';
 import { notFound } from 'next/navigation';
 import { CheckCircle, Clock, XCircle, MapPin, User, Phone, Calendar } from 'lucide-react';
 import DamLogo from '@/components/DamLogo';
+import { formatSlotDate, formatSlotRange } from '@/lib/timezone';
 
 export const revalidate = 0;
 
@@ -46,16 +47,8 @@ export default async function VerifyPage({ params }: Props) {
 
   if (!appointment) notFound();
 
-  const tz = process.env.BUSINESS_TIMEZONE || 'Asia/Kolkata';
-  const slotDate = new Date(appointment.slot_time);
-  const dateFormatted = slotDate.toLocaleDateString('en-US', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: tz,
-  });
-  const timeFormatted = `${slotDate.toLocaleTimeString('en-US', {
-    hour: '2-digit', minute: '2-digit', timeZone: tz,
-  })} - ${new Date(slotDate.getTime() + 15 * 60000).toLocaleTimeString('en-US', {
-    hour: '2-digit', minute: '2-digit', timeZone: tz, timeZoneName: 'short',
-  })}`;
+  const dateFormatted = formatSlotDate(appointment.slot_time, 'full');
+  const timeFormatted = formatSlotRange(appointment.slot_time, 15, true);
 
   const status = appointment.status as keyof typeof STATUS_CONFIG;
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG['booked'];

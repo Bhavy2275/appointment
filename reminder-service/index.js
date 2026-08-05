@@ -144,8 +144,8 @@ async function sendFiveMinuteWhatsAppReminders(client) {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
         timeZone: businessTimezone
       });
-      const startTimeFormatted = slotDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: businessTimezone });
-      const endTimeFormatted = slotEndDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: businessTimezone, timeZoneName: 'short' });
+      const startTimeFormatted = slotDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: businessTimezone });
+      const endTimeFormatted = slotEndDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: businessTimezone, timeZoneName: 'short' });
       const timeFormatted = `${startTimeFormatted} - ${endTimeFormatted}`;
 
       console.log(`\nSending 5-min WhatsApp reminder for appointment ${appointment.id} — ${appointment.customer_name}`);
@@ -240,8 +240,8 @@ async function run() {
         timeZone: businessTimezone
       });
       
-      const startTimeFormatted = slotDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: businessTimezone });
-      const endTimeFormatted = slotEndDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: businessTimezone, timeZoneName: 'short' });
+      const startTimeFormatted = slotDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: businessTimezone });
+      const endTimeFormatted = slotEndDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: businessTimezone, timeZoneName: 'short' });
       const timeFormatted = `${startTimeFormatted} - ${endTimeFormatted}`;
 
       console.log(

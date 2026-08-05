@@ -1,9 +1,18 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { Calendar, Clock, User, Mail, Phone, MessageSquare, CheckCircle, MapPin, ArrowRight, AlertCircle, ScanLine } from 'lucide-react';
-import { bookAppointment, TimeSlot } from '@/lib/actions';
+import { bookAppointment, getAvailableTimeSlots, TimeSlot } from '@/lib/actions';
 import QrScanner from '@/components/QrScanner';
+import {
+  formatSlotDate,
+  formatSlotTime,
+  formatSlotRange,
+  getKolkataDateString,
+  getKolkataDayName,
+  getKolkataDayNum,
+  getKolkataMonthName,
+} from '@/lib/timezone';
 
 interface BookingContainerProps {
   initialSlots: TimeSlot[];
@@ -27,11 +36,52 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
     timeFormatted: string;
   } | null>(null);
 
-  // Group slots by local date string
+  // Periodic background polling (every 3 seconds) & tab focus listener to keep slot availability in real-time sync across devices
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchLatestSlots = async () => {
+      try {
+        const latest = await getAvailableTimeSlots();
+        if (isMounted && Array.isArray(latest)) {
+          setSlots(latest);
+          // If current selected slot was booked by someone else in real-time, deselect it and show warning
+          setSelectedSlotTime((current) => {
+            if (current && !latest.some((s) => new Date(s.slot_time).toISOString() === new Date(current).toISOString())) {
+              setError('The slot you selected was just booked by another guest. Please select a different time slot.');
+              return '';
+            }
+            return current;
+          });
+        }
+      } catch (err) {
+        console.error('Failed to poll latest time slots:', err);
+      }
+    };
+
+    const intervalId = setInterval(fetchLatestSlots, 3000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLatestSlots();
+      }
+    };
+
+    window.addEventListener('focus', fetchLatestSlots);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      window.removeEventListener('focus', fetchLatestSlots);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Group slots by IST date string (YYYY-MM-DD)
   const slotsByDate: { [dateStr: string]: TimeSlot[] } = {};
   slots.forEach((slot) => {
-    const localDate = new Date(slot.slot_time);
-    const dateStr = localDate.toLocaleDateString('en-CA'); // YYYY-MM-DD local format
+    const dateStr = getKolkataDateString(slot.slot_time);
     if (!slotsByDate[dateStr]) {
       slotsByDate[dateStr] = [];
     }
@@ -95,25 +145,21 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
       });
 
       if (result.success && result.appointmentId) {
-        const slotDate = new Date(selectedSlotTime);
         setSuccessData({
           id: result.appointmentId,
-          dateFormatted: slotDate.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          }),
-          timeFormatted: slotDate.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
+          dateFormatted: formatSlotDate(selectedSlotTime, 'full'),
+          timeFormatted: formatSlotRange(selectedSlotTime, 15),
         });
         
         // Remove the booked slot from client state to prevent re-booking without reloading
         setSlots(prev => prev.filter(s => new Date(s.slot_time).toISOString() !== new Date(selectedSlotTime).toISOString()));
       } else {
         setError(result.error || 'Failed to book appointment.');
+        // Re-fetch latest available slots immediately on error so user sees updated slot list
+        try {
+          const latest = await getAvailableTimeSlots();
+          if (Array.isArray(latest)) setSlots(latest);
+        } catch (_) {}
       }
     });
   };
@@ -191,20 +237,17 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
     );
   }
 
-  // Formatting utility for calendar day item
+  // Formatting utility for calendar day item in IST
   const formatDayName = (dateStr: string) => {
-    const d = new Date(dateStr + 'T00:00:00'); // enforce local interpretation
-    return d.toLocaleDateString('en-US', { weekday: 'short' });
+    return getKolkataDayName(dateStr + 'T00:00:00+05:30');
   };
 
   const formatDayNum = (dateStr: string) => {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { day: 'numeric' });
+    return getKolkataDayNum(dateStr + 'T00:00:00+05:30');
   };
 
   const formatMonthName = (dateStr: string) => {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { month: 'short' });
+    return getKolkataMonthName(dateStr + 'T00:00:00+05:30');
   };
 
   return (
@@ -264,15 +307,7 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
                   {slotsByDate[selectedDateStr].map((slot) => {
                     const slotIso = new Date(slot.slot_time).toISOString();
                     const isSelected = selectedSlotTime === slotIso;
-                    const slotStart = new Date(slot.slot_time);
-                    const slotEnd = new Date(slotStart.getTime() + 15 * 60000);
-                    const slotTimeStr = `${slotStart.toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })} - ${slotEnd.toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}`;
+                    const slotTimeStr = formatSlotRange(slot.slot_time, 15);
 
                     return (
                       <button
@@ -311,16 +346,7 @@ export default function BookingContainer({ initialSlots }: BookingContainerProps
               <div>
                 <p className="text-xs text-white/60 font-semibold uppercase tracking-wider">Selected VR Session</p>
                 <p className="text-sm text-white font-bold mt-0.5" suppressHydrationWarning>
-                  {new Date(selectedSlotTime).toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                  })}{' '}
-                  at{' '}
-                  {new Date(selectedSlotTime).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {formatSlotDate(selectedSlotTime, 'medium')} at {formatSlotTime(selectedSlotTime)}
                 </p>
               </div>
             </div>
