@@ -117,8 +117,9 @@ async function sendFiveMinuteWhatsAppReminders(client) {
   console.log('\n--- Checking for upcoming 5-minute WhatsApp reminders ---');
 
   try {
-    // Only send the 5-minute reminder when the slot is between 3 and 8 minutes away.
-    // This prevents the reminder from firing immediately after booking when the slot is soon.
+    // Send the 5-minute reminder when slot is between 2 and 9 minutes away.
+    // Window is 2–9 min (not 3–8) to handle edge cases where bookings are made
+    // very close to the slot time and the 30-second poller needs extra margin.
     const queryText = `
       SELECT 
         id, 
@@ -129,8 +130,8 @@ async function sendFiveMinuteWhatsAppReminders(client) {
       FROM appointments
       WHERE status = 'booked'
         AND whatsapp_reminder_sent = FALSE
-        AND slot_time >= NOW() + INTERVAL '3 minutes'
-        AND slot_time <= NOW() + INTERVAL '8 minutes'
+        AND slot_time >= NOW() + INTERVAL '2 minutes'
+        AND slot_time <= NOW() + INTERVAL '9 minutes'
       ORDER BY slot_time ASC
     `;
     const result = await client.query(queryText);
@@ -340,11 +341,12 @@ async function run() {
 const isLoop = process.argv.includes('--watch') || process.argv.includes('--loop');
 
 if (isLoop) {
-  console.log('Starting Reminder Service in watch mode (polling database every 60 seconds)...');
+  // Poll every 30 seconds so bookings made close to the slot time don't slip through the window.
+  console.log('Starting Reminder Service in watch mode (polling database every 30 seconds)...');
   run().catch(err => console.error('Error in cron run:', err.message));
   setInterval(() => {
     run().catch(err => console.error('Error in cron run:', err.message));
-  }, 60000);
+  }, 30000);
 } else {
   run().catch(err => console.error('Error in cron run:', err.message));
 }
