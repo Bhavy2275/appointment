@@ -117,10 +117,10 @@ async function sendFiveMinuteWhatsAppReminders(client) {
   console.log('\n--- Checking for upcoming 5-minute WhatsApp reminders ---');
 
   try {
-    // Send the 5-minute reminder when slot is between 2 and 16 minutes away.
-    // Window is wide (2-16 min) because the Railway cron runs every 15 minutes.
-    // A slot 16 min away will be caught by the previous cron run, ensuring no
-    // reminder is ever missed due to the cron interval gap.
+    // The Railway cron runs every 5 minutes (*/5 * * * *).
+    // Appointment slots are every 15 minutes (:00, :15, :30, :45).
+    // This means the cron ALWAYS fires exactly 5 minutes before every slot.
+    // A 4–8 minute window catches that exact cron run with a 1-minute buffer.
     const queryText = `
       SELECT 
         id, 
@@ -131,8 +131,8 @@ async function sendFiveMinuteWhatsAppReminders(client) {
       FROM appointments
       WHERE status = 'booked'
         AND whatsapp_reminder_sent = FALSE
-        AND slot_time >= NOW() + INTERVAL '2 minutes'
-        AND slot_time <= NOW() + INTERVAL '16 minutes'
+        AND slot_time >= NOW() + INTERVAL '4 minutes'
+        AND slot_time <= NOW() + INTERVAL '8 minutes'
       ORDER BY slot_time ASC
     `;
     const result = await client.query(queryText);
