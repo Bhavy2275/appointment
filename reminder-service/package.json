@@ -4,7 +4,7 @@
   "description": "Standalone script to send appointment reminders via cron on Railway",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node index.js --loop",
     "dev": "node index.js --watch"
   },
   "dependencies": {
