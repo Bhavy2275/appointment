@@ -117,7 +117,8 @@ async function sendFiveMinuteWhatsAppReminders(client) {
   console.log('\n--- Checking for upcoming 5-minute WhatsApp reminders ---');
 
   try {
-    // Select appointments starting in the next 6 minutes that haven't received WhatsApp reminders yet
+    // Only send the 5-minute reminder when the slot is between 3 and 8 minutes away.
+    // This prevents the reminder from firing immediately after booking when the slot is soon.
     const queryText = `
       SELECT 
         id, 
@@ -128,8 +129,8 @@ async function sendFiveMinuteWhatsAppReminders(client) {
       FROM appointments
       WHERE status = 'booked'
         AND whatsapp_reminder_sent = FALSE
-        AND slot_time >= NOW() - INTERVAL '15 minutes'
-        AND slot_time <= NOW() + INTERVAL '30 minutes'
+        AND slot_time >= NOW() + INTERVAL '3 minutes'
+        AND slot_time <= NOW() + INTERVAL '8 minutes'
       ORDER BY slot_time ASC
     `;
     const result = await client.query(queryText);
